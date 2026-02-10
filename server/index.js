@@ -127,8 +127,10 @@ app.get('/sections', (_req, res) => {
 
 app.post('/control-numbers/next', authMiddleware, requireRole(['MC']), async (req, res) => {
   const { section, dateReceived } = req.body;
-  const mcSeq = await db.getNextCounter({ scope: 'MC', section: null });
-  const sectionSeq = await db.getNextCounter({ scope: 'SECTION', section });
+  if (!section) return res.status(400).json({ error: 'Section is required' });
+  if (!dateReceived) return res.status(400).json({ error: 'Date received is required' });
+  const mcSeq = await db.getNextCounter({ scope: 'MC', section: null, dateReceived });
+  const sectionSeq = await db.getNextCounter({ scope: 'SECTION', section, dateReceived });
   const mcCtrlNo = formatCtrlNo('RFU4A', null, dateReceived, mcSeq);
   const sectionCtrlNo = formatCtrlNo('RFU4A', section, dateReceived, sectionSeq);
   res.json({ mcCtrlNo, sectionCtrlNo });
@@ -138,6 +140,9 @@ app.post('/records', authMiddleware, async (req, res) => {
   const payload = req.body;
   if (req.user.role === 'SECTION' && payload.section !== req.user.section) {
     return res.status(403).json({ error: 'Forbidden' });
+  }
+  if (!payload.mcCtrlNo || !payload.sectionCtrlNo || !payload.dateReceived) {
+    return res.status(400).json({ error: 'Missing required control number or date received fields' });
   }
   const remarks = normalizeRemarks(payload);
   const record = await db.createRecord({ ...payload, remarks });

@@ -124,25 +124,47 @@ function getSqlite(sql, params = []) {
   });
 }
 
-async function getNextCounter({ scope, section }) {
+async function getNextCounter({ scope, section, dateReceived }) {
   if (isSqlite) {
     const existing = await getSqlite('SELECT * FROM counters WHERE scope = ? AND section IS ?;', [scope, section]);
+    const dateChanged = dateReceived && existing && existing.lastDateUsed !== dateReceived;
     if (!existing) {
-      await runSqlite('INSERT INTO counters (scope, section, currentNumber) VALUES (?, ?, 1);', [scope, section]);
+      await runSqlite('INSERT INTO counters (scope, section, currentNumber, lastDateUsed) VALUES (?, ?, 1, ?);', [
+        scope,
+        section,
+        dateReceived || null,
+      ]);
       return 1;
     }
-    const next = (existing.currentNumber || 0) + 1;
-    await runSqlite('UPDATE counters SET currentNumber = ? WHERE id = ?;', [next, existing.id]);
+    const baseNumber = dateChanged ? 0 : existing.currentNumber || 0;
+    const next = baseNumber + 1;
+    await runSqlite('UPDATE counters SET currentNumber = ?, lastDateUsed = ? WHERE id = ?;', [
+      next,
+      dateReceived || existing.lastDateUsed,
+      existing.id,
+    ]);
     return next;
   }
-  const result = await pgPool.query('SELECT * FROM counters WHERE scope = $1 AND section IS NOT DISTINCT FROM $2 LIMIT 1;', [scope, section]);
+  const result = await pgPool.query('SELECT * FROM counters WHERE scope = $1 AND section IS NOT DISTINCT FROM $2 LIMIT 1;', [
+    scope,
+    section,
+  ]);
   const existing = result.rows[0];
   if (!existing) {
-    const insert = await pgPool.query('INSERT INTO counters (scope, section, currentNumber) VALUES ($1, $2, 1) RETURNING currentNumber;', [scope, section]);
+    const insert = await pgPool.query(
+      'INSERT INTO counters (scope, section, currentNumber, lastDateUsed) VALUES ($1, $2, 1, $3) RETURNING currentNumber;',
+      [scope, section, dateReceived || null]
+    );
     return insert.rows[0].currentnumber || 1;
   }
-  const next = (existing.currentnumber || 0) + 1;
-  await pgPool.query('UPDATE counters SET currentNumber = $1 WHERE id = $2;', [next, existing.id]);
+  const dateChanged = dateReceived && existing.lastdateused !== dateReceived;
+  const baseNumber = dateChanged ? 0 : existing.currentnumber || 0;
+  const next = baseNumber + 1;
+  await pgPool.query('UPDATE counters SET currentNumber = $1, lastDateUsed = $2 WHERE id = $3;', [
+    next,
+    dateReceived || existing.lastdateused,
+    existing.id,
+  ]);
   return next;
 }
 

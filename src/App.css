@@ -42,13 +42,24 @@ button {
   position: relative;
   overflow: hidden;
   background: #0a1730;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
 }
 
 .login__image img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   display: block;
+  filter: saturate(1.05) contrast(1.05);
+}
+
+.login__image::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, rgba(4, 22, 46, 0.65), rgba(4, 22, 46, 0.15));
 }
 
 .login__panel {
@@ -56,13 +67,19 @@ button {
   align-items: center;
   justify-content: center;
   padding: 40px;
+  background: #f5f7fb;
 }
 
 .login__card {
   width: 100%;
   max-width: 320px;
   text-align: center;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  padding: 26px 24px 22px;
+  box-shadow: 0 16px 30px rgba(10, 23, 48, 0.18);
 }
+
 
 .login__seal,
 .sidebar__seal {
@@ -70,10 +87,10 @@ button {
   height: 72px;
   border-radius: 50%;
   object-fit: cover;
-  background: var(--white);
-  border: 2px solid #0d3f8c;
+  background: transparent;
+  border: 2px solid transparent;
   margin: 0 auto 12px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
 }
 
 .login h1 {
@@ -121,7 +138,7 @@ button {
   height: 34px;
   border-radius: 6px;
   border: none;
-  background: #2e2e2e;
+  background: #1f4c9c;
   color: var(--white);
   font-size: 13px;
   cursor: pointer;
@@ -202,7 +219,7 @@ button {
   display: grid;
   grid-template-rows: auto 1fr;
   border-top: 4px solid var(--blue-500);
-  background: #f7f7f7;
+  background: #f3f6fb;
 }
 
 .toolbar {
@@ -210,8 +227,9 @@ button {
   align-items: center;
   gap: 12px;
   padding: 12px 20px;
-  background: #f2f2f2;
-  border-bottom: 1px solid var(--border);
+  background: var(--white);
+  border-bottom: 1px solid #dfe4ec;
+  box-shadow: 0 4px 10px rgba(15, 38, 76, 0.05);
 }
 
 .toolbar__input {
@@ -235,6 +253,7 @@ button {
   background: var(--white);
   padding: 0 8px;
   font-size: 12px;
+  border-radius: 6px;
 }
 
 .toolbar button {
@@ -244,6 +263,7 @@ button {
   padding: 0 12px;
   cursor: pointer;
   font-size: 12px;
+  border-radius: 6px;
 }
 
 .toolbar__primary {
@@ -285,6 +305,9 @@ button {
 
 .table {
   padding: 12px 18px;
+  background: var(--white);
+  border-radius: 12px;
+  box-shadow: 0 10px 24px rgba(13, 34, 69, 0.08);
 }
 
 .table h3 {
@@ -293,27 +316,38 @@ button {
 }
 
 .table__grid {
-  border: 1px solid #bfbfbf;
+  border: 1px solid #e1e6ef;
   background: var(--white);
+  border-radius: 10px;
+  overflow: hidden;
 }
 
 .table__row {
   display: grid;
   grid-template-columns: repeat(12, 1fr);
-  border-bottom: 1px solid #d4d4d4;
+  border-bottom: 1px solid #eef1f6;
 }
 
 .table__row--head {
-  background: #efefef;
+  background: #f4f6fb;
   font-size: 12px;
   font-weight: 600;
+}
+
+.table__row--clickable {
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.table__row--clickable:hover {
+  background: #f0f5ff;
 }
 
 .table__cell {
   padding: 6px 6px;
   font-size: 12px;
-  border-right: 1px solid #d4d4d4;
-  color: #4b4b4b;
+  border-right: 1px solid #eef1f6;
+  color: #3b3f4a;
 }
 
 .table__link {
@@ -332,18 +366,18 @@ button {
 }
 
 .form-panel {
-  border-left: 1px solid #bfbfbf;
-  background: #f1f1f1;
+  border-left: 1px solid #dfe4ec;
+  background: #f6f8fc;
   display: grid;
   grid-template-rows: auto 1fr;
 }
 
 .form-panel__header {
-  background: #dedede;
+  background: #eef2f8;
   padding: 10px 12px;
   font-weight: 600;
   font-size: 13px;
-  border-bottom: 1px solid #bfbfbf;
+  border-bottom: 1px solid #dfe4ec;
 }
 
 .form-panel__body {
@@ -361,14 +395,23 @@ button {
 
 .form-panel__body input {
   height: 26px;
-  border: 1px solid #bcbcbc;
+  border: 1px solid #ced6e2;
+  border-radius: 6px;
   padding: 0 8px;
+  background: var(--white);
+}
+
+.form-panel__body .input--error {
+  border-color: #d93025;
+  background: #fff5f5;
 }
 
 .form-panel__body select {
   height: 26px;
-  border: 1px solid #bcbcbc;
+  border: 1px solid #ced6e2;
+  border-radius: 6px;
   padding: 0 8px;
+  background: var(--white);
 }
 
 .form-panel__body input[type='file'] {
@@ -418,20 +461,29 @@ button {
 
 .form-panel__actions button {
   height: 28px;
-  border: 1px solid #9c9c9c;
-  background: #e0e0e0;
+  border: 1px solid #c8d1df;
+  background: #e9edf6;
   padding: 0 16px;
   cursor: pointer;
 }
 
 .form-panel__actions .secondary {
-  background: #f7f7f7;
+  background: #f9fbff;
+}
+
+.form-panel__error {
+  background: #fff3f3;
+  border: 1px solid #f4b6b6;
+  color: #b32121;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12px;
 }
 
 .modal {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(5, 14, 30, 0.45);
   display: grid;
   place-items: center;
   z-index: 10;
@@ -439,23 +491,61 @@ button {
 
 .modal__card {
   background: var(--white);
-  padding: 20px;
-  border-radius: 10px;
-  width: 320px;
+  padding: 22px;
+  border-radius: 14px;
+  width: 360px;
   display: grid;
+  gap: 14px;
+  box-shadow: 0 18px 40px rgba(10, 23, 48, 0.3);
+}
+
+.modal__card--wide {
+  width: min(720px, 90vw);
+}
+
+.modal__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
-.modal__card label {
+.modal__grid label {
   display: grid;
   gap: 6px;
   font-size: 12px;
 }
 
+.modal__grid input,
+.modal__grid select {
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid #ced6e2;
+  padding: 0 8px;
+  background: #fbfcff;
+}
+
+.modal__span {
+  grid-column: 1 / -1;
+}
+
 .modal__actions {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   justify-content: flex-end;
+}
+
+.modal__actions--spread {
+  justify-content: space-between;
+}
+
+.modal__actions .secondary {
+  background: #f1f4f9;
+}
+
+.modal__actions .danger {
+  background: #ffecec;
+  border: 1px solid #f2bcbc;
+  color: #b32121;
 }
 
 @media (max-width: 980px) {
@@ -464,7 +554,7 @@ button {
   }
 
   .login__image {
-    height: 260px;
+    height: 320px;
   }
 
   .dashboard {
