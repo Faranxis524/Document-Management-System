@@ -109,6 +109,14 @@ button {
   font-size: 13px;
 }
 
+.login__form select {
+  height: 34px;
+  border-radius: 6px;
+  border: 1px solid #dcdcdc;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
 .login__form button {
   height: 34px;
   border-radius: 6px;
@@ -180,6 +188,11 @@ button {
   color: var(--blue-700);
 }
 
+.sidebar__link--locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .sidebar__link--logout {
   color: var(--blue-700);
   margin-top: 10px;
@@ -216,6 +229,14 @@ button {
   flex-wrap: wrap;
 }
 
+.toolbar__filters select {
+  height: 30px;
+  border: 1px solid #bcbcbc;
+  background: var(--white);
+  padding: 0 8px;
+  font-size: 12px;
+}
+
 .toolbar button {
   height: 30px;
   border: 1px solid #bcbcbc;
@@ -223,6 +244,12 @@ button {
   padding: 0 12px;
   cursor: pointer;
   font-size: 12px;
+}
+
+.toolbar__primary {
+  background: #1f4c9c;
+  color: var(--white);
+  border-color: #1f4c9c;
 }
 
 .toolbar__date {
@@ -272,7 +299,7 @@ button {
 
 .table__row {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  grid-template-columns: repeat(12, 1fr);
   border-bottom: 1px solid #d4d4d4;
 }
 
@@ -287,6 +314,17 @@ button {
   font-size: 12px;
   border-right: 1px solid #d4d4d4;
   color: #4b4b4b;
+}
+
+.table__link {
+  color: #1f4c9c;
+  text-decoration: underline;
+}
+
+.table__row--empty .table__cell {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 10px;
 }
 
 .table__cell:last-child {
@@ -327,6 +365,34 @@ button {
   padding: 0 8px;
 }
 
+.form-panel__body select {
+  height: 26px;
+  border: 1px solid #bcbcbc;
+  padding: 0 8px;
+}
+
+.form-panel__body input[type='file'] {
+  height: auto;
+  padding: 4px 0;
+}
+
+.form-panel__checkboxes {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.form-panel__checkboxes label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-panel__remarks {
+  font-size: 11px;
+  color: var(--muted);
+}
+
 .input-icon {
   position: relative;
 }
@@ -360,6 +426,36 @@ button {
 
 .form-panel__actions .secondary {
   background: #f7f7f7;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: grid;
+  place-items: center;
+  z-index: 10;
+}
+
+.modal__card {
+  background: var(--white);
+  padding: 20px;
+  border-radius: 10px;
+  width: 320px;
+  display: grid;
+  gap: 12px;
+}
+
+.modal__card label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.modal__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 @media (max-width: 980px) {
