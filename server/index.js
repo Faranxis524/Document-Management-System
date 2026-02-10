@@ -122,10 +122,43 @@ function requireRole(roles) {
 
 function normalizeRemarks(payload) {
   const selected = [];
-  if (payload.remarksEmail) selected.push('Email');
-  if (payload.remarksViber) selected.push('Viber');
-  if (payload.remarksHardCopy) selected.push('Hard Copy');
-  return selected.join(' / ');
+  if (payload.remarksEmail) selected.push('email');
+  if (payload.remarksViber) selected.push('viber');
+  if (payload.remarksHardCopy) selected.push('hardcopy');
+
+  if (selected.length === 0) return '';
+  return `sent through ${selected.join('/ ')}`;
+}
+
+function coerceRemarksText(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  // Already in the desired format.
+  if (raw.toLowerCase().startsWith('sent through')) return raw;
+
+  // Strip brackets from previously formatted values.
+  if (raw.startsWith('[') && raw.endsWith(']')) {
+    const inner = raw.slice(1, -1).trim();
+    if (inner.toLowerCase().startsWith('sent through')) return inner;
+  }
+
+  // Backward-compat: older records were stored like: "Email / Viber" or "Hard Copy".
+  const tokens = raw
+    .split('/')
+    .map((part) => part.trim().toLowerCase())
+    .filter(Boolean)
+    .map((part) => {
+      if (part === 'hard copy' || part === 'hardcopy') return 'hardcopy';
+      if (part === 'email') return 'email';
+      if (part === 'viber') return 'viber';
+      return '';
+    })
+    .filter(Boolean);
+
+  if (tokens.length === 0) return '';
+  const order = { email: 1, viber: 2, hardcopy: 3 };
+  const uniqueSorted = Array.from(new Set(tokens)).sort((a, b) => order[a] - order[b]);
+  return `sent through ${uniqueSorted.join('/ ')}`;
 }
 
 function formatCtrlNo(prefix, section, dateStr, seq) {
@@ -190,9 +223,9 @@ app.post('/records', authMiddleware, async (req, res) => {
     return res.status(400).json({ error: 'Section and date received are required' });
   }
   const { mcCtrlNo, sectionCtrlNo } = await getNextControlNumbers(payload.section, payload.dateReceived, false);
-  const remarks = normalizeRemarks(payload);
-  const record = await db.createRecord({ ...payload, mcCtrlNo, sectionCtrlNo, remarks });
-  res.json(record);
+  const remarksText = normalizeRemarks(payload);
+  const record = await db.createRecord({ ...payload, mcCtrlNo, sectionCtrlNo, remarks: remarksText });
+  res.json({ ...record, remarksText });
 });
 
 app.get('/records', authMiddleware, async (req, res) => {
@@ -204,7 +237,12 @@ app.get('/records', authMiddleware, async (req, res) => {
     filters.section = section;
   }
   const records = await db.listRecords(filters);
-  res.json({ records });
+  res.json({
+    records: records.map((row) => ({
+      ...row,
+      remarksText: coerceRemarksText(row.remarks),
+    })),
+  });
 });
 
 app.get('/records/:id', authMiddleware, async (req, res) => {
@@ -222,9 +260,9 @@ app.put('/records/:id', authMiddleware, async (req, res) => {
   if (req.user.role === 'SECTION' && record.section !== req.user.section) {
     return res.status(403).json({ error: 'Forbidden' });
   }
-  const remarks = normalizeRemarks(req.body);
-  const updated = await db.updateRecord(req.params.id, { ...req.body, remarks });
-  res.json(updated);
+  const remarksText = normalizeRemarks(req.body);
+  const updated = await db.updateRecord(req.params.id, { ...req.body, remarks: remarksText });
+  res.json({ ...updated, remarksText });
 });
 
 app.delete('/records/:id', authMiddleware, async (req, res) => {
@@ -315,7 +353,7 @@ app.post('/export', authMiddleware, async (req, res) => {
     const subject = row.subjectFileUrl
       ? { text: row.subjectText || 'File', hyperlink: row.subjectFileUrl }
       : row.subjectText;
-    sheet.addRow({ ...row, subjectText: subject });
+    sheet.addRow({ ...row, subjectText: subject, remarks: coerceRemarksText(row.remarks) });
   });
 
   const buffer = await workbook.xlsx.writeBuffer();

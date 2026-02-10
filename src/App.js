@@ -111,11 +111,29 @@ function formatCtrlNo(prefix, section, dateStr, seq) {
   return `${prefix}${suffix}-${date}-${padded}`;
 }
 
+function parseRemarksFlags(remarksText) {
+  const raw = String(remarksText || '').toLowerCase();
+  const content = raw.replace(/^\s*sent through\s*/, '');
+  const tokens = content
+    .split('/')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const has = (value) => tokens.includes(value);
+
+  return {
+    remarksEmail: has('email'),
+    remarksViber: has('viber'),
+    remarksHardCopy: has('hardcopy') || has('hard copy'),
+  };
+}
+
 function App() {
   const [view, setView] = useState('login');
   const [userIndex, setUserIndex] = useState(0);
   const [loginPassword, setLoginPassword] = useState('password');
   const [activeSection, setActiveSection] = useState('MC Master List');
+  const [isTableExpanded, setIsTableExpanded] = useState(false);
   const [records, setRecords] = useState([]);
   const [recordForm, setRecordForm] = useState(INITIAL_RECORD);
   const [formErrors, setFormErrors] = useState({});
@@ -176,10 +194,11 @@ function App() {
 
   const remarksText = useMemo(() => {
     const parts = [];
-    if (recordForm.remarksEmail) parts.push('Email');
-    if (recordForm.remarksViber) parts.push('Viber');
-    if (recordForm.remarksHardCopy) parts.push('Hard Copy');
-    return parts.join(' / ');
+    if (recordForm.remarksEmail) parts.push('email');
+    if (recordForm.remarksViber) parts.push('viber');
+    if (recordForm.remarksHardCopy) parts.push('hardcopy');
+    if (parts.length === 0) return '';
+    return `sent through ${parts.join('/ ')}`;
   }, [recordForm]);
 
   const sectionOptions = SECTIONS.map((section) => (
@@ -385,7 +404,8 @@ function App() {
   };
 
   const handleOpenEdit = (row) => {
-    setEditForm({ ...row, subjectFile: null });
+    const fromRemarks = parseRemarksFlags(row.remarksText || row.remarks);
+    setEditForm({ ...row, ...fromRemarks, subjectFile: null });
     setEditFormErrors({});
     setEditFormErrorMessage('');
     setEditModal({ open: true, recordId: row.id });
@@ -504,6 +524,15 @@ function App() {
       setIsSaving(false);
     }
   };
+
+  const editRemarksText = useMemo(() => {
+    const parts = [];
+    if (editForm.remarksEmail) parts.push('email');
+    if (editForm.remarksViber) parts.push('viber');
+    if (editForm.remarksHardCopy) parts.push('hardcopy');
+    if (parts.length === 0) return '';
+    return `sent through ${parts.join('/ ')}`;
+  }, [editForm]);
 
   const handleDeleteRecord = async () => {
     if (!editModal.recordId) return;
@@ -671,7 +700,17 @@ function App() {
             <div className="content__body">
               <div className="tables">
                 <section key={activeSection} className="table">
-                  <h3>{activeSection}</h3>
+                  <header className="table__header">
+                    <h3>{activeSection}</h3>
+                    <button
+                      type="button"
+                      className="table__expand"
+                      onClick={() => setIsTableExpanded(true)}
+                      title="Open a clear, expanded view of the table"
+                    >
+                      Clear View
+                    </button>
+                  </header>
                   <div className="table__grid">
                     <div className="table__row table__row--head">
                       {TABLE_COLUMNS.map((col) => (
@@ -714,7 +753,7 @@ function App() {
                         <div className="table__cell">{row.targetDate}</div>
                         <div className="table__cell">{row.receivedBy}</div>
                         <div className="table__cell">{row.actionTaken}</div>
-                        <div className="table__cell">{row.remarksText}</div>
+                        <div className="table__cell">{row.remarksText || row.remarks || ''}</div>
                         <div className="table__cell">{row.concernedUnits}</div>
                         <div className="table__cell">{row.dateSent}</div>
                         <div className="table__cell">{row.createdBy || '-'}</div>
@@ -951,6 +990,85 @@ function App() {
 
       {false}
 
+      {isTableExpanded && (
+        <div className="modal" onClick={() => setIsTableExpanded(false)}>
+          <div
+            className="modal__card modal__card--table"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Expanded table view"
+          >
+            <div className="modal__table-header">
+              <h3>{activeSection} — Clear View</h3>
+              <button type="button" className="secondary" onClick={() => setIsTableExpanded(false)}>
+                Close
+              </button>
+            </div>
+            <div className="table__grid table__grid--expanded">
+              <div className="table__row table__row--head table__row--expanded">
+                {TABLE_COLUMNS.map((col) => (
+                  <div key={`expanded-${activeSection}-${col}`} className="table__cell table__cell--head">
+                    {col}
+                  </div>
+                ))}
+              </div>
+              {displayRecords.map((row) => (
+                <div
+                  key={`expanded-${row.id || `${activeSection}-${row.mcCtrlNo}`}`}
+                  className="table__row table__row--clickable table__row--expanded"
+                  onClick={() => {
+                    setIsTableExpanded(false);
+                    handleOpenEdit(row);
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      setIsTableExpanded(false);
+                      handleOpenEdit(row);
+                    }
+                  }}
+                >
+                  <div className="table__cell">{row.mcCtrlNo}</div>
+                  <div className="table__cell">{row.sectionCtrlNo}</div>
+                  <div className="table__cell">{row.section}</div>
+                  <div className="table__cell">{row.dateReceived}</div>
+                  <div className="table__cell">
+                    {row.subjectFileUrl ? (
+                      <a
+                        className="table__link"
+                        href={getRecordFileHref(row.id, row.subjectFileUrl, authToken)}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        {row.subjectText || 'View File'}
+                      </a>
+                    ) : (
+                      row.subjectText
+                    )}
+                  </div>
+                  <div className="table__cell">{row.fromValue}</div>
+                  <div className="table__cell">{row.targetDate}</div>
+                  <div className="table__cell">{row.receivedBy}</div>
+                  <div className="table__cell">{row.actionTaken}</div>
+                  <div className="table__cell">{row.remarksText || row.remarks || ''}</div>
+                  <div className="table__cell">{row.concernedUnits}</div>
+                  <div className="table__cell">{row.dateSent}</div>
+                  <div className="table__cell">{row.createdBy || '-'}</div>
+                </div>
+              ))}
+              {displayRecords.length === 0 && (
+                <div className="table__row table__row--empty">
+                  <div className="table__cell">No records yet.</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {editModal.open && (
         <div className="modal">
           <div className="modal__card modal__card--wide">
@@ -1058,6 +1176,34 @@ function App() {
                   <option value="FILED">Filed</option>
                 </select>
               </label>
+              <div className="modal__span form-panel__checkboxes form-panel__checkboxes--modal">
+                <span>Remarks (Sent Through)</span>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(editForm.remarksEmail)}
+                    onChange={(event) => handleEditFieldChange('remarksEmail', event.target.checked)}
+                  />
+                  Email
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(editForm.remarksViber)}
+                    onChange={(event) => handleEditFieldChange('remarksViber', event.target.checked)}
+                  />
+                  Viber
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(editForm.remarksHardCopy)}
+                    onChange={(event) => handleEditFieldChange('remarksHardCopy', event.target.checked)}
+                  />
+                  Hard Copy
+                </label>
+                <div className="form-panel__remarks">Output: {editRemarksText || '-'}</div>
+              </div>
               <label>
                 Concerned Units
                 <input

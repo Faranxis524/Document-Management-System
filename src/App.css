@@ -340,6 +340,28 @@ button:focus-visible {
   padding: 0;
 }
 
+.table__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.table__expand {
+  height: 30px;
+  border: 1px solid #c8d1df;
+  background: #e9edf6;
+  padding: 0 12px;
+  cursor: pointer;
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+.table__expand:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .table {
   padding: 14px 20px;
   background: var(--white);
@@ -392,7 +414,9 @@ button:focus-visible {
   border-right: 1px solid #eef1f6;
   color: #3b3f4a;
   white-space: normal;
-  word-break: break-word;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  hyphens: auto;
 }
 
 .table__link {
@@ -563,6 +587,33 @@ button:focus-visible {
 
 .modal__card--wide {
   width: min(780px, 92vw);
+  max-height: min(86vh, 760px);
+  overflow: auto;
+}
+
+.modal__card--table {
+  width: min(1280px, 96vw);
+  height: min(80vh, 820px);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+}
+
+.modal__table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.table__grid--expanded {
+  overflow: auto;
+}
+
+.table__row--expanded {
+  /* Keep readable widths per column and allow horizontal scroll in expanded view */
+  min-width: 1400px;
+  grid-template-columns: 160px 160px 110px 120px 260px 120px 120px 160px 140px 200px 180px 120px 140px;
 }
 
 .modal__grid {
@@ -584,6 +635,42 @@ button:focus-visible {
   border: 1px solid #ced6e2;
   padding: 0 10px;
   background: #fbfcff;
+}
+
+/* Make the remarks checkbox block more compact + aligned inside the edit modal */
+.modal__grid .form-panel__checkboxes--modal {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 12px;
+  padding: 10px 12px;
+  align-items: center;
+}
+
+.modal__grid .form-panel__checkboxes--modal > span {
+  grid-column: 1 / -1;
+  font-weight: 700;
+  color: #2b2f39;
+}
+
+.modal__grid .form-panel__checkboxes--modal label {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.2;
+  gap: 8px;
+  justify-content: flex-start;
+}
+
+.modal__grid .form-panel__checkboxes--modal input[type='checkbox'] {
+  height: auto;
+  width: 14px;
+  margin: 0;
+}
+
+.modal__grid .form-panel__checkboxes--modal .form-panel__remarks {
+  grid-column: 1 / -1;
+  margin-top: 0;
+  padding-top: 6px;
+  border-top: 1px dashed #d9e1ef;
 }
 
 .modal__span {
