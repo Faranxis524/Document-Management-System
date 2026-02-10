@@ -124,6 +124,27 @@ function getSqlite(sql, params = []) {
   });
 }
 
+function peekNextCounter(existing, dateReceived) {
+  if (!existing) return 1;
+  const lastUsed = isSqlite ? existing.lastDateUsed : existing.lastdateused;
+  const current = isSqlite ? existing.currentNumber : existing.currentnumber;
+  const dateChanged = dateReceived && lastUsed !== dateReceived;
+  const base = dateChanged ? 0 : (current || 0);
+  return base + 1;
+}
+
+async function getNextCounterPreview({ scope, section, dateReceived }) {
+  if (isSqlite) {
+    const existing = await getSqlite('SELECT * FROM counters WHERE scope = ? AND section IS ?;', [scope, section]);
+    return peekNextCounter(existing, dateReceived);
+  }
+  const result = await pgPool.query('SELECT * FROM counters WHERE scope = $1 AND section IS NOT DISTINCT FROM $2 LIMIT 1;', [
+    scope,
+    section,
+  ]);
+  return peekNextCounter(result.rows[0], dateReceived);
+}
+
 async function getNextCounter({ scope, section, dateReceived }) {
   if (isSqlite) {
     const existing = await getSqlite('SELECT * FROM counters WHERE scope = ? AND section IS ?;', [scope, section]);
@@ -277,24 +298,27 @@ async function getRecord(id) {
 }
 
 async function updateRecord(id, payload) {
+  const current = await getRecord(id);
+  if (!current) return null;
+
   const now = new Date().toISOString();
   const fields = {
-    mcCtrlNo: payload.mcCtrlNo,
-    sectionCtrlNo: payload.sectionCtrlNo,
-    section: payload.section,
-    dateReceived: payload.dateReceived,
-    subjectText: payload.subjectText,
-    subjectFileUrl: payload.subjectFileUrl,
-    fromValue: payload.fromValue,
-    fromType: payload.fromType,
-    targetDate: payload.targetDate,
-    targetDateMode: payload.targetDateMode,
-    receivedBy: payload.receivedBy,
-    actionTaken: payload.actionTaken,
-    remarks: payload.remarks,
-    concernedUnits: payload.concernedUnits,
-    dateSent: payload.dateSent,
-    updatedBy: payload.updatedBy || payload.username,
+    mcCtrlNo: payload.mcCtrlNo ?? current.mcCtrlNo,
+    sectionCtrlNo: payload.sectionCtrlNo ?? current.sectionCtrlNo,
+    section: payload.section ?? current.section,
+    dateReceived: payload.dateReceived ?? current.dateReceived,
+    subjectText: payload.subjectText ?? current.subjectText,
+    subjectFileUrl: payload.subjectFileUrl ?? current.subjectFileUrl,
+    fromValue: payload.fromValue ?? current.fromValue,
+    fromType: payload.fromType ?? current.fromType,
+    targetDate: payload.targetDate ?? current.targetDate,
+    targetDateMode: payload.targetDateMode ?? current.targetDateMode,
+    receivedBy: payload.receivedBy ?? current.receivedBy,
+    actionTaken: payload.actionTaken ?? current.actionTaken,
+    remarks: payload.remarks ?? current.remarks,
+    concernedUnits: payload.concernedUnits ?? current.concernedUnits,
+    dateSent: payload.dateSent ?? current.dateSent,
+    updatedBy: payload.updatedBy || payload.username || current.updatedBy,
     updatedAt: now,
   };
 
@@ -387,6 +411,31 @@ async function updateRecord(id, payload) {
   return update.rows[0];
 }
 
+async function updateRecordFile(id, { subjectFileUrl, updatedBy }) {
+  const now = new Date().toISOString();
+  if (isSqlite) {
+    await runSqlite(
+      `UPDATE records SET
+        subjectFileUrl = ?,
+        updatedBy = ?,
+        updatedAt = ?
+      WHERE id = ?;`,
+      [subjectFileUrl, updatedBy || null, now, id]
+    );
+    return await getRecord(id);
+  }
+
+  const update = await pgPool.query(
+    `UPDATE records SET
+      subjectFileUrl = $1,
+      updatedBy = $2,
+      updatedAt = $3
+    WHERE id = $4 RETURNING *;`,
+    [subjectFileUrl, updatedBy || null, now, id]
+  );
+  return update.rows[0];
+}
+
 async function deleteRecord(id) {
   if (isSqlite) {
     await runSqlite('DELETE FROM records WHERE id = ?;', [id]);
@@ -401,8 +450,10 @@ module.exports = {
     listRecords,
     getRecord,
     updateRecord,
+    updateRecordFile,
     deleteRecord,
     getNextCounter,
+    getNextCounterPreview,
   },
   initDb,
   isSqlite,

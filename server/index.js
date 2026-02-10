@@ -19,6 +19,32 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+function getMonthFolder(dateString) {
+  const sourceDate = dateString ? new Date(`${dateString}T00:00:00`) : new Date();
+  const safeDate = Number.isNaN(sourceDate.getTime()) ? new Date() : sourceDate;
+  return safeDate.toLocaleString('en-US', { month: 'long' }).toLowerCase();
+}
+
+function sanitizeFolderName(value, fallback) {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-');
+  return normalized || fallback;
+}
+
+function resolveStoredFilePath(subjectFileUrl) {
+  const relativeUrl = String(subjectFileUrl || '')
+    .replace(/^\/uploads\/?/, '')
+    .replace(/^\/+/, '');
+  const normalizedRelative = path.normalize(relativeUrl).replace(/^([.]{2}[\\/])+/, '');
+  const resolvedPath = path.resolve(uploadDir, normalizedRelative);
+  if (!resolvedPath.startsWith(uploadDir)) {
+    return null;
+  }
+  return resolvedPath;
+}
+
 const maxFileSizeMb = Number(process.env.MAX_FILE_SIZE_MB || 50);
 const upload = multer({
   dest: uploadDir,
@@ -73,7 +99,9 @@ function signToken(user) {
 
 function authMiddleware(req, res, next) {
   const auth = req.headers.authorization || '';
-  const token = auth.replace('Bearer ', '');
+  const bearerToken = auth.replace('Bearer ', '');
+  const queryToken = typeof req.query?.token === 'string' ? req.query.token : '';
+  const token = bearerToken || queryToken;
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   try {
     req.user = jwt.verify(token, jwtSecret);
@@ -125,15 +153,32 @@ app.get('/sections', (_req, res) => {
   res.json({ sections: ['INVES', 'INTEL', 'ADM', 'OPN'] });
 });
 
+async function getNextControlNumbers(section, dateReceived, preview = false) {
+  const getCounter = preview ? db.getNextCounterPreview : db.getNextCounter;
+  const mcSeq = await getCounter({ scope: 'MC', section: null, dateReceived });
+  const sectionSeq = await getCounter({ scope: 'SECTION', section, dateReceived });
+  const mcCtrlNo = formatCtrlNo('RFU4A', null, dateReceived, mcSeq);
+  const sectionCtrlNo = formatCtrlNo('RFU4A', section, dateReceived, sectionSeq);
+  return { mcCtrlNo, sectionCtrlNo };
+}
+
 app.post('/control-numbers/next', authMiddleware, requireRole(['MC']), async (req, res) => {
   const { section, dateReceived } = req.body;
   if (!section) return res.status(400).json({ error: 'Section is required' });
   if (!dateReceived) return res.status(400).json({ error: 'Date received is required' });
-  const mcSeq = await db.getNextCounter({ scope: 'MC', section: null, dateReceived });
-  const sectionSeq = await db.getNextCounter({ scope: 'SECTION', section, dateReceived });
-  const mcCtrlNo = formatCtrlNo('RFU4A', null, dateReceived, mcSeq);
-  const sectionCtrlNo = formatCtrlNo('RFU4A', section, dateReceived, sectionSeq);
-  res.json({ mcCtrlNo, sectionCtrlNo });
+  const result = await getNextControlNumbers(section, dateReceived, false);
+  res.json(result);
+});
+
+app.post('/control-numbers/preview', authMiddleware, async (req, res) => {
+  const { section, dateReceived } = req.body;
+  if (!section) return res.status(400).json({ error: 'Section is required' });
+  if (!dateReceived) return res.status(400).json({ error: 'Date received is required' });
+  if (req.user.role === 'SECTION' && req.user.section !== section) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  const result = await getNextControlNumbers(section, dateReceived, true);
+  res.json(result);
 });
 
 app.post('/records', authMiddleware, async (req, res) => {
@@ -141,11 +186,12 @@ app.post('/records', authMiddleware, async (req, res) => {
   if (req.user.role === 'SECTION' && payload.section !== req.user.section) {
     return res.status(403).json({ error: 'Forbidden' });
   }
-  if (!payload.mcCtrlNo || !payload.sectionCtrlNo || !payload.dateReceived) {
-    return res.status(400).json({ error: 'Missing required control number or date received fields' });
+  if (!payload.section || !payload.dateReceived) {
+    return res.status(400).json({ error: 'Section and date received are required' });
   }
+  const { mcCtrlNo, sectionCtrlNo } = await getNextControlNumbers(payload.section, payload.dateReceived, false);
   const remarks = normalizeRemarks(payload);
-  const record = await db.createRecord({ ...payload, remarks });
+  const record = await db.createRecord({ ...payload, mcCtrlNo, sectionCtrlNo, remarks });
   res.json(record);
 });
 
@@ -197,17 +243,49 @@ app.post('/records/:id/upload', authMiddleware, upload.single('file'), async (re
   if (req.user.role === 'SECTION' && record.section !== req.user.section) {
     return res.status(403).json({ error: 'Forbidden' });
   }
-  const fileUrl = `/uploads/${req.file.filename}`;
-  const updated = await db.updateRecord(req.params.id, { subjectFileUrl: fileUrl });
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+  const monthFolder = sanitizeFolderName(getMonthFolder(record.dateReceived), 'unknown-month');
+  const sectionFolder = sanitizeFolderName(record.section, 'general');
+  const targetDir = path.join(uploadDir, monthFolder, sectionFolder);
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
+
+  const ext = path.extname(req.file.originalname || '').toLowerCase();
+  const storedName = `${req.file.filename}${ext}`;
+  const tempPath = path.join(uploadDir, req.file.filename);
+  const finalPath = path.join(targetDir, storedName);
+  if (tempPath !== finalPath && fs.existsSync(tempPath)) {
+    fs.renameSync(tempPath, finalPath);
+  }
+  const fileUrl = `/uploads/${monthFolder}/${sectionFolder}/${storedName}`;
+  const updated = await db.updateRecordFile(req.params.id, { subjectFileUrl: fileUrl, updatedBy: req.user.username });
   res.json(updated);
 });
 
-app.get('/records/:id/download', authMiddleware, async (req, res) => {
+app.get('/records/:id/file', authMiddleware, async (req, res) => {
   const record = await db.getRecord(req.params.id);
   if (!record) return res.status(404).json({ error: 'Not found' });
+  if (req.user.role === 'SECTION' && record.section !== req.user.section) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   if (!record.subjectFileUrl) return res.status(404).json({ error: 'No file' });
-  const filePath = path.join(uploadDir, path.basename(record.subjectFileUrl));
-  res.download(filePath);
+
+  const filePath = resolveStoredFilePath(record.subjectFileUrl);
+  if (!filePath || !fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+
+  const ext = path.extname(filePath).toLowerCase();
+  const contentTypeByExt = {
+    '.pdf': 'application/pdf',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  };
+  const contentType = contentTypeByExt[ext] || 'application/octet-stream';
+  const fileName = path.basename(filePath);
+
+  res.setHeader('Content-Type', contentType);
+  res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+  res.sendFile(filePath);
 });
 
 app.post('/export', authMiddleware, async (req, res) => {

@@ -6,6 +6,24 @@ import loginBg from './assets/login-bg.png';
 import logo from './assets/logo.png';
 
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5000';
+
+function resolveFileUrl(fileUrl) {
+  if (!fileUrl) return '';
+  if (/^https?:\/\//i.test(fileUrl)) return fileUrl;
+  return `${API_BASE}${fileUrl.startsWith('/') ? '' : '/'}${fileUrl}`;
+}
+
+function isUsableRecord(record) {
+  return Boolean(record && record.id && record.section && record.mcCtrlNo && record.sectionCtrlNo);
+}
+
+function getRecordFileHref(recordId, fileUrl, token) {
+  if (recordId && token) {
+    return `${API_BASE}/records/${recordId}/file?token=${encodeURIComponent(token)}`;
+  }
+  return resolveFileUrl(fileUrl);
+}
+
 const USERS = [
   { label: 'NUP Tala (MC)', username: 'NUP Tala', role: 'MC', section: null },
   { label: 'PMSG Foncardas (MC)', username: 'PMSG Foncardas', role: 'MC', section: null },
@@ -55,9 +73,16 @@ const TABLE_COLUMNS = [
   'Remarks',
   'Concerned Units',
   'Date Sent',
+  'Encoded By',
 ];
 
-const NAV_ITEMS = ['MC Masterlist', ...SECTIONS.map((section) => SECTION_LABELS[section])];
+const REPORT_SIGNATORIES = [
+  { name: 'Catherine Batalon', position: 'Chief' },
+  { name: 'Francis Dave', position: 'PLTCOL' },
+  { name: 'Athena Almendral', position: 'Admin Operation' },
+];
+
+const NAV_ITEMS = ['MC Master List', ...SECTIONS.map((section) => SECTION_LABELS[section])];
 
 const INITIAL_RECORD = {
   mcCtrlNo: '',
@@ -90,7 +115,7 @@ function App() {
   const [view, setView] = useState('login');
   const [userIndex, setUserIndex] = useState(0);
   const [loginPassword, setLoginPassword] = useState('password');
-  const [activeSection, setActiveSection] = useState('MC Masterlist');
+  const [activeSection, setActiveSection] = useState('MC Master List');
   const [records, setRecords] = useState([]);
   const [recordForm, setRecordForm] = useState(INITIAL_RECORD);
   const [formErrors, setFormErrors] = useState({});
@@ -108,6 +133,8 @@ function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [editModal, setEditModal] = useState({ open: false, recordId: null });
   const [editForm, setEditForm] = useState(INITIAL_RECORD);
+  const [editFormErrors, setEditFormErrors] = useState({});
+  const [editFormErrorMessage, setEditFormErrorMessage] = useState('');
 
   const currentUser = USERS[userIndex];
   const isMc = currentUser?.role === 'MC';
@@ -116,8 +143,8 @@ function App() {
     const activeSectionKey = Object.keys(SECTION_LABELS).find((key) => SECTION_LABELS[key] === activeSection);
     return records.filter((row) => {
       if (!isMc && row.section !== currentUser.section) return false;
-      if (activeSection !== 'MC Masterlist' && activeSectionKey && row.section !== activeSectionKey) return false;
-      if (activeSection === 'MC Masterlist' && filterSection !== 'ALL' && row.section !== filterSection) return false;
+      if (activeSection !== 'MC Master List' && activeSectionKey && row.section !== activeSectionKey) return false;
+      if (activeSection === 'MC Master List' && filterSection !== 'ALL' && row.section !== filterSection) return false;
       if (filterAction !== 'ALL' && row.actionTaken !== filterAction) return false;
       if (filterMonth || filterYear) {
         const [year, month] = (row.dateReceived || '').split('-');
@@ -245,10 +272,24 @@ function App() {
     });
   };
 
+  const clearEditFieldError = (field) => {
+    setEditFormErrors((prev) => {
+      if (!prev[field]) return prev;
+      const { [field]: _ignored, ...rest } = prev;
+      return rest;
+    });
+  };
+
   const handleFieldChange = (field, value) => {
     setRecordForm((prev) => ({ ...prev, [field]: value }));
     clearFieldError(field);
     setFormErrorMessage('');
+  };
+
+  const handleEditFieldChange = (field, value) => {
+    setEditForm((prev) => ({ ...prev, [field]: value }));
+    clearEditFieldError(field);
+    setEditFormErrorMessage('');
   };
 
   const getNextCounter = (counter, dateReceived) => {
@@ -308,16 +349,26 @@ function App() {
         method: 'POST',
         body: JSON.stringify({ ...payload, createdBy: currentUser.username }),
       });
+      setRecords((prev) => [created, ...prev]);
+
       let savedRecord = created;
       if (subjectFile) {
         const formData = new FormData();
         formData.append('file', subjectFile);
-        savedRecord = await apiFetch(`/records/${created.id}/upload`, {
-          method: 'POST',
-          body: formData,
-        });
+        try {
+          savedRecord = await apiFetch(`/records/${created.id}/upload`, {
+            method: 'POST',
+            body: formData,
+          });
+        } catch (uploadError) {
+          setApiError(`Record saved, but file upload failed: ${uploadError.message}`);
+        }
       }
-      setRecords((prev) => [savedRecord, ...prev]);
+      if (isUsableRecord(savedRecord)) {
+        setRecords((prev) => prev.map((row) => (row.id === savedRecord.id ? savedRecord : row)));
+      } else {
+        setApiError('Record was saved, but upload response was invalid. Please refresh after restarting backend server.');
+      }
       setRecordForm((prev) => ({
         ...INITIAL_RECORD,
         section: isMc ? prev.section : currentUser.section,
@@ -335,16 +386,22 @@ function App() {
 
   const handleOpenEdit = (row) => {
     setEditForm({ ...row, subjectFile: null });
+    setEditFormErrors({});
+    setEditFormErrorMessage('');
     setEditModal({ open: true, recordId: row.id });
   };
 
   const handleExportPdf = () => {
     const doc = new jsPDF({ orientation: 'landscape' });
-    const title = `CIDG RFU 4A Records${filterMonth || filterYear ? ` (${filterMonth || 'All'}-${filterYear || 'All'})` : ''}`;
+    const title = 'CIDG RFU4A Message Center Master List';
     doc.setFontSize(12);
     doc.text(title, 14, 12);
+    if (filterMonth || filterYear) {
+      doc.setFontSize(9);
+      doc.text(`Filtered by: ${filterMonth || 'All Months'} ${filterYear || 'All Years'}`, 14, 17);
+    }
     autoTable(doc, {
-      startY: 18,
+      startY: filterMonth || filterYear ? 22 : 18,
       head: [TABLE_COLUMNS],
       body: displayRecords.map((row) => [
         row.mcCtrlNo,
@@ -359,26 +416,90 @@ function App() {
         row.remarksText,
         row.concernedUnits,
         row.dateSent,
+        row.createdBy || '-',
       ]),
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [31, 76, 156] },
     });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 14;
+    const signatoryBlockWidth = (pageWidth - margin * 2) / 3;
+    let signY = (doc.lastAutoTable?.finalY || 24) + 20;
+
+    if (signY > pageHeight - 26) {
+      doc.addPage();
+      signY = 30;
+    }
+
+    doc.setFontSize(10);
+    REPORT_SIGNATORIES.forEach((person, index) => {
+      const x = margin + signatoryBlockWidth * index;
+      const lineStartX = x + 8;
+      const lineEndX = x + signatoryBlockWidth - 8;
+      const centerX = (lineStartX + lineEndX) / 2;
+
+      doc.line(lineStartX, signY, lineEndX, signY);
+      doc.text(person.name, centerX, signY + 6, { align: 'center' });
+      doc.text(person.position, centerX, signY + 12, { align: 'center' });
+    });
+
     doc.save('records.pdf');
   };
 
   const handleUpdateRecord = async () => {
     if (!editModal.recordId) return;
+
+    const errors = {};
+    if (!editForm.dateReceived) errors.dateReceived = 'Date received is required.';
+    if (!editForm.subjectText && !editForm.subjectFile) errors.subjectText = 'Provide a subject or upload a document.';
+    if (!editForm.fromValue) errors.fromValue = 'From field is required.';
+    if (!editForm.targetDate) errors.targetDate = 'Target date is required.';
+    if (!editForm.receivedBy) errors.receivedBy = 'Received by is required.';
+    if (!editForm.concernedUnits) errors.concernedUnits = 'Concerned unit is required.';
+
+    if (Object.keys(errors).length > 0) {
+      setEditFormErrors(errors);
+      setEditFormErrorMessage('Please complete the required edit fields highlighted in red.');
+      return;
+    }
+
     setIsSaving(true);
     setApiError('');
+    setEditFormErrorMessage('');
     try {
+      const { subjectFile, ...payload } = editForm;
       const updated = await apiFetch(`/records/${editModal.recordId}`, {
         method: 'PUT',
-        body: JSON.stringify({ ...editForm, updatedBy: currentUser.username }),
+        body: JSON.stringify({ ...payload, updatedBy: currentUser.username }),
       });
       setRecords((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+
+      let nextRecord = updated;
+      if (subjectFile) {
+        const formData = new FormData();
+        formData.append('file', subjectFile);
+        try {
+          nextRecord = await apiFetch(`/records/${editModal.recordId}/upload`, {
+            method: 'POST',
+            body: formData,
+          });
+        } catch (uploadError) {
+          setApiError(`Record updated, but file upload failed: ${uploadError.message}`);
+        }
+      }
+
+      if (isUsableRecord(nextRecord)) {
+        setRecords((prev) => prev.map((row) => (row.id === nextRecord.id ? nextRecord : row)));
+      } else {
+        setApiError('Record was updated, but upload response was invalid. Please refresh after restarting backend server.');
+      }
+      setEditFormErrors({});
       setEditModal({ open: false, recordId: null });
     } catch (error) {
       setApiError(error.message);
+      setEditFormErrorMessage('Unable to update record right now. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -386,20 +507,24 @@ function App() {
 
   const handleDeleteRecord = async () => {
     if (!editModal.recordId) return;
+    if (!window.confirm('Are you sure you want to delete this record? This action cannot be undone.')) return;
     setIsSaving(true);
     setApiError('');
+    setEditFormErrorMessage('');
     try {
       await apiFetch(`/records/${editModal.recordId}`, { method: 'DELETE' });
       setRecords((prev) => prev.filter((row) => row.id !== editModal.recordId));
       setEditModal({ open: false, recordId: null });
     } catch (error) {
       setApiError(error.message);
+      setEditFormErrorMessage('Unable to delete record right now. Please try again.');
     } finally {
       setIsSaving(false);
     }
   };
 
   const getFieldClass = (field) => (formErrors[field] ? 'input--error' : '');
+  const getEditFieldClass = (field) => (editFormErrors[field] ? 'input--error' : '');
 
   return (
     <div className="app-shell">
@@ -437,9 +562,6 @@ function App() {
                 <button type="button" onClick={handleLogin} disabled={isLoading}>
                   {isLoading ? 'Signing In...' : 'Sign In'}
                 </button>
-                <button type="button" className="login__link">
-                  Forgot password?
-                </button>
               </form>
             </div>
           </div>
@@ -454,7 +576,7 @@ function App() {
             </div>
             <nav className="sidebar__nav">
               {NAV_ITEMS.map((item) => {
-                const isSectionTab = item !== 'MC Masterlist';
+                const isSectionTab = item !== 'MC Master List';
                 const section = Object.keys(SECTION_LABELS).find((key) => SECTION_LABELS[key] === item);
                 const allowed = !isSectionTab || isMc || (section && currentUser?.section === section);
                 return (
@@ -473,6 +595,18 @@ function App() {
                 Logout
               </button>
             </nav>
+            <div className="sidebar__profile">
+              <h4>Active Profile</h4>
+              <p>
+                <strong>Name:</strong> {currentUser.username}
+              </p>
+              <p>
+                <strong>Role:</strong> {currentUser.role}
+              </p>
+              <p>
+                <strong>Section:</strong> {currentUser.section || 'MC'}
+              </p>
+            </div>
           </aside>
 
           <main className="content">
@@ -565,7 +699,7 @@ function App() {
                           {row.subjectFileUrl ? (
                             <a
                               className="table__link"
-                              href={row.subjectFileUrl}
+                              href={getRecordFileHref(row.id, row.subjectFileUrl, authToken)}
                               target="_blank"
                               rel="noreferrer"
                               onClick={(event) => event.stopPropagation()}
@@ -583,6 +717,7 @@ function App() {
                         <div className="table__cell">{row.remarksText}</div>
                         <div className="table__cell">{row.concernedUnits}</div>
                         <div className="table__cell">{row.dateSent}</div>
+                        <div className="table__cell">{row.createdBy || '-'}</div>
                       </div>
                     ))}
                     {displayRecords.length === 0 && (
@@ -598,14 +733,6 @@ function App() {
                 <div className="form-panel__header">Document Form Panel</div>
                 <form className="form-panel__body">
                   {formErrorMessage && <div className="form-panel__error">{formErrorMessage}</div>}
-                  <label>
-                    MC Ctrl No.
-                    <input type="text" value={recordForm.mcCtrlNo} readOnly className={getFieldClass('mcCtrlNo')} />
-                  </label>
-                  <label>
-                    Section Ctrl No.
-                    <input type="text" value={recordForm.sectionCtrlNo} readOnly className={getFieldClass('sectionCtrlNo')} />
-                  </label>
                   <label>
                     Section
                     <select
@@ -652,6 +779,14 @@ function App() {
                       }}
                       className={getFieldClass('dateReceived')}
                     />
+                  </label>
+                  <label>
+                    MC Ctrl No.
+                    <input type="text" value={recordForm.mcCtrlNo} readOnly className={getFieldClass('mcCtrlNo')} />
+                  </label>
+                  <label>
+                    Section Ctrl No.
+                    <input type="text" value={recordForm.sectionCtrlNo} readOnly className={getFieldClass('sectionCtrlNo')} />
                   </label>
                   <label>
                     Subject
@@ -820,6 +955,7 @@ function App() {
         <div className="modal">
           <div className="modal__card modal__card--wide">
             <h3>Edit Record</h3>
+            {editFormErrorMessage && <div className="form-panel__error modal__error">{editFormErrorMessage}</div>}
             <div className="modal__grid">
               <label>
                 MC Ctrl No.
@@ -833,8 +969,9 @@ function App() {
                 Section
                 <select
                   value={editForm.section}
-                  onChange={(event) => setEditForm((prev) => ({ ...prev, section: event.target.value }))}
+                  onChange={(event) => handleEditFieldChange('section', event.target.value)}
                   disabled={!isMc}
+                  className={getEditFieldClass('section')}
                 >
                   {sectionOptions}
                 </select>
@@ -844,7 +981,8 @@ function App() {
                 <input
                   type="date"
                   value={editForm.dateReceived}
-                  onChange={(event) => setEditForm((prev) => ({ ...prev, dateReceived: event.target.value }))}
+                  onChange={(event) => handleEditFieldChange('dateReceived', event.target.value)}
+                  className={getEditFieldClass('dateReceived')}
                 />
               </label>
               <label className="modal__span">
@@ -852,15 +990,43 @@ function App() {
                 <input
                   type="text"
                   value={editForm.subjectText}
-                  onChange={(event) => setEditForm((prev) => ({ ...prev, subjectText: event.target.value }))}
+                  onChange={(event) => handleEditFieldChange('subjectText', event.target.value)}
+                  className={getEditFieldClass('subjectText')}
                 />
+              </label>
+              <label className="modal__span">
+                Replace Uploaded Document (PDF/DOCX)
+                <input
+                  type="file"
+                  accept=".pdf,.docx"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] || null;
+                    if (file && !['.pdf', '.docx'].includes(file.name.toLowerCase().slice(file.name.lastIndexOf('.')))) {
+                      setEditFormErrorMessage('Please upload a PDF or DOCX file.');
+                      return;
+                    }
+                    setEditFormErrorMessage('');
+                    handleEditFieldChange('subjectFile', file);
+                  }}
+                />
+                {editForm.subjectFileUrl && (
+                  <a
+                    className="table__link"
+                    href={getRecordFileHref(editForm.id, editForm.subjectFileUrl, authToken)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View current uploaded file
+                  </a>
+                )}
               </label>
               <label>
                 From
                 <input
                   type="text"
                   value={editForm.fromValue}
-                  onChange={(event) => setEditForm((prev) => ({ ...prev, fromValue: event.target.value }))}
+                  onChange={(event) => handleEditFieldChange('fromValue', event.target.value)}
+                  className={getEditFieldClass('fromValue')}
                 />
               </label>
               <label>
@@ -868,7 +1034,8 @@ function App() {
                 <input
                   type="text"
                   value={editForm.targetDate}
-                  onChange={(event) => setEditForm((prev) => ({ ...prev, targetDate: event.target.value }))}
+                  onChange={(event) => handleEditFieldChange('targetDate', event.target.value)}
+                  className={getEditFieldClass('targetDate')}
                 />
               </label>
               <label>
@@ -876,14 +1043,15 @@ function App() {
                 <input
                   type="text"
                   value={editForm.receivedBy}
-                  onChange={(event) => setEditForm((prev) => ({ ...prev, receivedBy: event.target.value }))}
+                  onChange={(event) => handleEditFieldChange('receivedBy', event.target.value)}
+                  className={getEditFieldClass('receivedBy')}
                 />
               </label>
               <label>
                 Action Taken
                 <select
                   value={editForm.actionTaken}
-                  onChange={(event) => setEditForm((prev) => ({ ...prev, actionTaken: event.target.value }))}
+                  onChange={(event) => handleEditFieldChange('actionTaken', event.target.value)}
                 >
                   <option value="DRAFTED">Drafted</option>
                   <option value="DISSEMINATED">Disseminated</option>
@@ -895,7 +1063,8 @@ function App() {
                 <input
                   type="text"
                   value={editForm.concernedUnits}
-                  onChange={(event) => setEditForm((prev) => ({ ...prev, concernedUnits: event.target.value }))}
+                  onChange={(event) => handleEditFieldChange('concernedUnits', event.target.value)}
+                  className={getEditFieldClass('concernedUnits')}
                 />
               </label>
               <label>
@@ -903,20 +1072,20 @@ function App() {
                 <input
                   type="date"
                   value={editForm.dateSent}
-                  onChange={(event) => setEditForm((prev) => ({ ...prev, dateSent: event.target.value }))}
+                  onChange={(event) => handleEditFieldChange('dateSent', event.target.value)}
                 />
               </label>
             </div>
             <div className="modal__actions modal__actions--spread">
-              <button type="button" className="danger" onClick={handleDeleteRecord}>
-                Delete
+              <button type="button" className="danger" onClick={handleDeleteRecord} disabled={isSaving}>
+                {isSaving ? 'Please wait...' : 'Delete'}
               </button>
               <div className="modal__actions">
-                <button type="button" className="secondary" onClick={() => setEditModal({ open: false, index: null })}>
+                <button type="button" className="secondary" onClick={() => setEditModal({ open: false, recordId: null })}>
                   Cancel
                 </button>
-                <button type="button" onClick={handleUpdateRecord}>
-                  Save Changes
+                <button type="button" onClick={handleUpdateRecord} disabled={isSaving}>
+                  {isSaving ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </div>

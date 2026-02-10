@@ -28,6 +28,14 @@ button {
   font-family: inherit;
 }
 
+input:focus,
+select:focus,
+button:focus-visible {
+  outline: none;
+  border-color: var(--blue-500);
+  box-shadow: 0 0 0 3px rgba(47, 120, 210, 0.16);
+}
+
 /* Login */
 .login {
   display: grid;
@@ -159,6 +167,7 @@ button {
   grid-template-columns: 240px 1fr;
   min-height: 100vh;
   background: #e7edf5;
+  overflow: hidden;
 }
 
 .sidebar {
@@ -215,55 +224,78 @@ button {
   margin-top: 10px;
 }
 
+.sidebar__profile {
+  margin-top: 18px;
+  padding: 10px 12px;
+  border: 1px solid #dbe3f0;
+  border-radius: 8px;
+  background: #f7faff;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.sidebar__profile h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: #1f4c9c;
+}
+
+.sidebar__profile p {
+  margin: 2px 0;
+  color: #3b3f4a;
+}
+
 .content {
   display: grid;
   grid-template-rows: auto 1fr;
   border-top: 4px solid var(--blue-500);
   background: #f3f6fb;
+  overflow: hidden;
 }
 
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 20px;
+  gap: 14px;
+  padding: 14px 20px;
   background: var(--white);
   border-bottom: 1px solid #dfe4ec;
   box-shadow: 0 4px 10px rgba(15, 38, 76, 0.05);
 }
 
 .toolbar__input {
-  width: 160px;
-  height: 30px;
+  width: 220px;
+  height: 34px;
   border: 1px solid #bcbcbc;
-  padding: 0 10px;
+  border-radius: 8px;
+  padding: 0 12px;
   background: var(--white);
 }
 
 .toolbar__filters {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
 .toolbar__filters select {
-  height: 30px;
+  height: 34px;
   border: 1px solid #bcbcbc;
   background: var(--white);
-  padding: 0 8px;
+  padding: 0 10px;
   font-size: 12px;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 .toolbar button {
-  height: 30px;
+  height: 34px;
   border: 1px solid #bcbcbc;
   background: #e1e1e1;
-  padding: 0 12px;
+  padding: 0 14px;
   cursor: pointer;
   font-size: 12px;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 .toolbar__primary {
@@ -275,28 +307,33 @@ button {
 .toolbar__date {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: 12px;
 }
 
 .toolbar__date input {
-  width: 36px;
-  height: 26px;
+  width: 136px;
+  height: 34px;
   border: 1px solid #bcbcbc;
+  border-radius: 8px;
+  padding: 0 8px;
   background: var(--white);
 }
 
 .content__body {
   display: grid;
-  grid-template-columns: 1fr 260px;
+  grid-template-columns: 1fr 300px;
   gap: 0;
   height: 100%;
+  overflow: hidden;
 }
 
 .tables {
   display: grid;
   gap: 16px;
-  padding: 12px 18px 20px;
+  padding: 16px 18px 20px;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .tables .table {
@@ -304,14 +341,18 @@ button {
 }
 
 .table {
-  padding: 12px 18px;
+  padding: 14px 20px;
   background: var(--white);
   border-radius: 12px;
   box-shadow: 0 10px 24px rgba(13, 34, 69, 0.08);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 0;
 }
 
 .table h3 {
-  margin: 8px 0 10px;
+  margin: 12px 0 12px;
   font-size: 15px;
 }
 
@@ -320,11 +361,13 @@ button {
   background: var(--white);
   border-radius: 10px;
   overflow: hidden;
+  min-height: 0;
 }
 
 .table__row {
   display: grid;
-  grid-template-columns: repeat(12, 1fr);
+  grid-template-columns: repeat(13, minmax(0, 1fr));
+  width: 100%;
   border-bottom: 1px solid #eef1f6;
 }
 
@@ -344,10 +387,12 @@ button {
 }
 
 .table__cell {
-  padding: 6px 6px;
+  padding: 8px 8px;
   font-size: 12px;
   border-right: 1px solid #eef1f6;
   color: #3b3f4a;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .table__link {
@@ -382,21 +427,24 @@ button {
 
 .form-panel__body {
   display: grid;
-  gap: 10px;
-  padding: 12px;
+  gap: 9px;
+  padding: 10px;
+  overflow: hidden;
+  align-content: start;
 }
 
 .form-panel__body label {
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 500;
   color: #3e3e3e;
   display: grid;
   gap: 4px;
 }
 
 .form-panel__body input {
-  height: 26px;
+  height: 29px;
   border: 1px solid #ced6e2;
-  border-radius: 6px;
+  border-radius: 7px;
   padding: 0 8px;
   background: var(--white);
 }
@@ -407,22 +455,26 @@ button {
 }
 
 .form-panel__body select {
-  height: 26px;
+  height: 29px;
   border: 1px solid #ced6e2;
-  border-radius: 6px;
+  border-radius: 7px;
   padding: 0 8px;
   background: var(--white);
 }
 
 .form-panel__body input[type='file'] {
   height: auto;
-  padding: 4px 0;
+  padding: 3px 0;
 }
 
 .form-panel__checkboxes {
   display: grid;
-  gap: 6px;
-  font-size: 12px;
+  gap: 5px;
+  font-size: 11px;
+  padding: 6px 8px;
+  border: 1px solid #d9e1ef;
+  border-radius: 8px;
+  background: #fbfdff;
 }
 
 .form-panel__checkboxes label {
@@ -432,7 +484,7 @@ button {
 }
 
 .form-panel__remarks {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--muted);
 }
 
@@ -454,17 +506,21 @@ button {
 
 .form-panel__actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   justify-content: flex-end;
   margin-top: 4px;
+  padding-top: 3px;
+  border-top: 1px solid #e7ecf4;
 }
 
 .form-panel__actions button {
-  height: 28px;
+  height: 30px;
   border: 1px solid #c8d1df;
   background: #e9edf6;
-  padding: 0 16px;
+  padding: 0 12px;
   cursor: pointer;
+  border-radius: 7px;
+  font-size: 12px;
 }
 
 .form-panel__actions .secondary {
@@ -475,9 +531,15 @@ button {
   background: #fff3f3;
   border: 1px solid #f4b6b6;
   color: #b32121;
-  padding: 8px 10px;
+  padding: 9px 10px;
   border-radius: 6px;
   font-size: 12px;
+  line-height: 1.4;
+}
+
+.toolbar__filters .form-panel__error {
+  flex-basis: 100%;
+  margin-bottom: 2px;
 }
 
 .modal {
@@ -491,22 +553,22 @@ button {
 
 .modal__card {
   background: var(--white);
-  padding: 22px;
+  padding: 24px;
   border-radius: 14px;
   width: 360px;
   display: grid;
-  gap: 14px;
+  gap: 16px;
   box-shadow: 0 18px 40px rgba(10, 23, 48, 0.3);
 }
 
 .modal__card--wide {
-  width: min(720px, 90vw);
+  width: min(780px, 92vw);
 }
 
 .modal__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 14px;
 }
 
 .modal__grid label {
@@ -517,10 +579,10 @@ button {
 
 .modal__grid input,
 .modal__grid select {
-  height: 30px;
+  height: 34px;
   border-radius: 6px;
   border: 1px solid #ced6e2;
-  padding: 0 8px;
+  padding: 0 10px;
   background: #fbfcff;
 }
 
@@ -532,6 +594,19 @@ button {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+}
+
+.modal__actions button {
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid #c8d1df;
+  background: #e9edf6;
+  padding: 0 16px;
+  cursor: pointer;
+}
+
+.modal__error {
+  margin-bottom: -2px;
 }
 
 .modal__actions--spread {
