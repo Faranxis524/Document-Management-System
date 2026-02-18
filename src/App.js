@@ -138,13 +138,13 @@ function App() {
   const [recordForm, setRecordForm] = useState(INITIAL_RECORD);
   const [formErrors, setFormErrors] = useState({});
   const [formErrorMessage, setFormErrorMessage] = useState('');
-  const [search, setSearch] = useState('');
-  const [filterSection, setFilterSection] = useState('ALL');
-  const [filterAction, setFilterAction] = useState('ALL');
-  const [filterMonth, setFilterMonth] = useState('');
-  const [filterYear, setFilterYear] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [search, setSearch] = useState(() => localStorage.getItem('dms_search') || '');
+  const [filterSection, setFilterSection] = useState(() => localStorage.getItem('dms_filterSection') || 'ALL');
+  const [filterAction, setFilterAction] = useState(() => localStorage.getItem('dms_filterAction') || 'ALL');
+  const [filterMonth, setFilterMonth] = useState(() => localStorage.getItem('dms_filterMonth') || '');
+  const [filterYear, setFilterYear] = useState(() => localStorage.getItem('dms_filterYear') || '');
+  const [dateFrom, setDateFrom] = useState(() => localStorage.getItem('dms_dateFrom') || '');
+  const [dateTo, setDateTo] = useState(() => localStorage.getItem('dms_dateTo') || '');
   const [authToken, setAuthToken] = useState('');
   const [apiError, setApiError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -173,7 +173,7 @@ function App() {
       if (dateTo && row.dateReceived > dateTo) return false;
       if (search) {
         const needle = search.toLowerCase();
-        const hay = `${row.mcCtrlNo} ${row.sectionCtrlNo} ${row.subjectText}`.toLowerCase();
+        const hay = `${row.mcCtrlNo} ${row.sectionCtrlNo} ${row.subjectText} ${row.fromValue} ${row.receivedBy} ${row.concernedUnits} ${row.actionTaken}`.toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
@@ -248,6 +248,34 @@ function App() {
       isActive = false;
     };
   }, [authToken]);
+
+  useEffect(() => {
+    localStorage.setItem('dms_search', search);
+  }, [search]);
+
+  useEffect(() => {
+    localStorage.setItem('dms_filterSection', filterSection);
+  }, [filterSection]);
+
+  useEffect(() => {
+    localStorage.setItem('dms_filterAction', filterAction);
+  }, [filterAction]);
+
+  useEffect(() => {
+    localStorage.setItem('dms_filterMonth', filterMonth);
+  }, [filterMonth]);
+
+  useEffect(() => {
+    localStorage.setItem('dms_filterYear', filterYear);
+  }, [filterYear]);
+
+  useEffect(() => {
+    localStorage.setItem('dms_dateFrom', dateFrom);
+  }, [dateFrom]);
+
+  useEffect(() => {
+    localStorage.setItem('dms_dateTo', dateTo);
+  }, [dateTo]);
 
   const handleLogin = async () => {
     setApiError('');
@@ -547,6 +575,25 @@ function App() {
     } catch (error) {
       setApiError(error.message);
       setEditFormErrorMessage('Unable to delete record right now. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRemoveFile = async () => {
+    if (!editModal.recordId) return;
+    if (!window.confirm('Are you sure you want to remove this file? This action cannot be undone.')) return;
+    
+    setIsSaving(true);
+    setApiError('');
+    try {
+      await apiFetch(`/records/${editModal.recordId}/file`, { method: 'DELETE' });
+      const updated = { ...editForm, subjectFileUrl: null };
+      setEditForm(updated);
+      setRecords((prev) => prev.map((row) => (row.id === editModal.recordId ? updated : row)));
+    } catch (error) {
+      setApiError(error.message);
+      setEditFormErrorMessage('Unable to remove file. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -1128,14 +1175,32 @@ function App() {
                   }}
                 />
                 {editForm.subjectFileUrl && (
-                  <a
-                    className="table__link"
-                    href={getRecordFileHref(editForm.id, editForm.subjectFileUrl, authToken)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    View current uploaded file
-                  </a>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '8px' }}>
+                    <a
+                      className="table__link"
+                      href={getRecordFileHref(editForm.id, editForm.subjectFileUrl, authToken)}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      View current uploaded file
+                    </a>
+                    <button
+                      type="button"
+                      onClick={handleRemoveFile}
+                      disabled={isSaving}
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '12px',
+                        backgroundColor: '#e74c3c',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Remove File
+                    </button>
+                  </div>
                 )}
               </label>
               <label>

@@ -53,6 +53,26 @@ async function initDb() {
         lastDateUsed TEXT
       );
     `);
+    await runSqlite(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT NOT NULL,
+        section TEXT,
+        isActive INTEGER DEFAULT 1,
+        createdAt TEXT,
+        updatedAt TEXT
+      );
+    `);
+    
+    // Create indexes for better query performance
+    await runSqlite(`CREATE INDEX IF NOT EXISTS idx_records_section ON records(section);`);
+    await runSqlite(`CREATE INDEX IF NOT EXISTS idx_records_dateReceived ON records(dateReceived);`);
+    await runSqlite(`CREATE INDEX IF NOT EXISTS idx_records_createdBy ON records(createdBy);`);
+    await runSqlite(`CREATE INDEX IF NOT EXISTS idx_records_actionTaken ON records(actionTaken);`);
+    await runSqlite(`CREATE INDEX IF NOT EXISTS idx_counters_scope_section ON counters(scope, section);`);
+    await runSqlite(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);`);
   } else {
     pgPool = new Pool({
       host: process.env.PG_HOST,
@@ -94,6 +114,26 @@ async function initDb() {
         lastDateUsed TEXT
       );
     `);
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT NOT NULL,
+        section TEXT,
+        isActive BOOLEAN DEFAULT TRUE,
+        createdAt TEXT,
+        updatedAt TEXT
+      );
+    `);
+    
+    // Create indexes for better query performance
+    await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_records_section ON records(section);`);
+    await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_records_dateReceived ON records(dateReceived);`);
+    await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_records_createdBy ON records(createdBy);`);
+    await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_records_actionTaken ON records(actionTaken);`);
+    await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_counters_scope_section ON counters(scope, section);`);
+    await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);`);
   }
 }
 
@@ -149,6 +189,34 @@ async function getNextCounter({ scope, section, dateReceived }) {
   if (isSqlite) {
     const existing = await getSqlite('SELECT * FROM counters WHERE scope = ? AND section IS ?;', [scope, section]);
     const dateChanged = dateReceived && existing && existing.lastDateUsed !== dateReceived;
+    
+    // Verify counter accuracy by checking actual records
+    if (existing && !dateChanged && section && dateReceived) {
+      const records = await allSqlite(
+        'SELECT mcCtrlNo, sectionCtrlNo FROM records WHERE section = ? AND dateReceived = ?;',
+        [section, dateReceived]
+      );
+      
+      // Find the highest actual sequence number
+      let highestActual = 0;
+      records.forEach(record => {
+        const ctrlNo = scope === 'MC' ? record.mcCtrlNo : record.sectionCtrlNo;
+        if (ctrlNo) {
+          const match = ctrlNo.match(/-(\d+)$/);
+          if (match) {
+            const seq = parseInt(match[1], 10);
+            if (seq > highestActual) highestActual = seq;
+          }
+        }
+      });
+      
+      // If counter is higher than actual records, reset it
+      if (existing.currentNumber > highestActual) {
+        await runSqlite('UPDATE counters SET currentNumber = ? WHERE id = ?;', [highestActual, existing.id]);
+        return highestActual + 1;
+      }
+    }
+    
     if (!existing) {
       await runSqlite('INSERT INTO counters (scope, section, currentNumber, lastDateUsed) VALUES (?, ?, 1, ?);', [
         scope,
@@ -171,6 +239,41 @@ async function getNextCounter({ scope, section, dateReceived }) {
     section,
   ]);
   const existing = result.rows[0];
+  const dateChanged = dateReceived && existing && existing.lastdateused !== dateReceived;
+  
+  // Verify counter accuracy by checking actual records
+  if (existing && !dateChanged && section && dateReceived) {
+    const recordsResult = await pgPool.query(
+      'SELECT "mcCtrlNo", "sectionCtrlNo" FROM records WHERE section = $1 AND "dateReceived" = $2;',
+      [section, dateReceived]
+    );
+    
+    // Find the highest actual sequence number
+    let highestActual = 0;
+    recordsResult.rows.forEach(record => {
+      const ctrlNo = scope === 'MC' ? record.mcCtrlNo : record.sectionCtrlNo;
+      if (ctrlNo) {
+        const match = ctrlNo.match(/-(\d+)$/);
+        if (match) {
+          const seq = parseInt(match[1], 10);
+          if (seq > highestActual) highestActual = seq;
+        }
+      }
+    });
+    
+    // If counter is higher than actual records, reset it
+    if (existing.currentnumber > highestActual) {
+      await pgPool.query('UPDATE counters SET "currentNumber" = $1 WHERE id = $2;', [highestActual, existing.id]);
+      const next = highestActual + 1;
+      await pgPool.query('UPDATE counters SET "currentNumber" = $1, "lastDateUsed" = $2 WHERE id = $3;', [
+        next,
+        dateReceived || existing.lastdateused,
+        existing.id,
+      ]);
+      return next;
+    }
+  }
+  
   if (!existing) {
     const insert = await pgPool.query(
       'INSERT INTO counters (scope, section, currentNumber, lastDateUsed) VALUES ($1, $2, 1, $3) RETURNING currentNumber;',
@@ -178,7 +281,6 @@ async function getNextCounter({ scope, section, dateReceived }) {
     );
     return insert.rows[0].currentnumber || 1;
   }
-  const dateChanged = dateReceived && existing.lastdateused !== dateReceived;
   const baseNumber = dateChanged ? 0 : existing.currentnumber || 0;
   const next = baseNumber + 1;
   await pgPool.query('UPDATE counters SET currentNumber = $1, lastDateUsed = $2 WHERE id = $3;', [
@@ -444,6 +546,232 @@ async function deleteRecord(id) {
   await pgPool.query('DELETE FROM records WHERE id = $1;', [id]);
 }
 
+async function resetCountersForSection(section, dateReceived) {
+  // Get all records for this section and date to find the highest control number
+  let records;
+  if (isSqlite) {
+    records = await allSqlite(
+      'SELECT mcCtrlNo, sectionCtrlNo FROM records WHERE section = ? AND dateReceived = ? ORDER BY id DESC;',
+      [section, dateReceived]
+    );
+  } else {
+    const result = await pgPool.query(
+      'SELECT "mcCtrlNo", "sectionCtrlNo" FROM records WHERE section = $1 AND "dateReceived" = $2 ORDER BY id DESC;',
+      [section, dateReceived]
+    );
+    records = result.rows;
+  }
+
+  // Extract the highest sequence numbers from control numbers
+  let highestMC = 0;
+  let highestSection = 0;
+
+  records.forEach(record => {
+    const mcCtrlNo = isSqlite ? record.mcCtrlNo : record.mcCtrlNo;
+    const sectionCtrlNo = isSqlite ? record.sectionCtrlNo : record.sectionCtrlNo;
+
+    if (mcCtrlNo) {
+      const match = mcCtrlNo.match(/-MC-(\d+)-(\d+)$/);
+      if (match) {
+        const seq = parseInt(match[2], 10);
+        if (seq > highestMC) highestMC = seq;
+      }
+    }
+
+    if (sectionCtrlNo) {
+      const match = sectionCtrlNo.match(/-(\d+)-(\d+)$/);
+      if (match) {
+        const seq = parseInt(match[2], 10);
+        if (seq > highestSection) highestSection = seq;
+      }
+    }
+  });
+
+  // Reset counters to the highest found (or 0 if no records)
+  if (isSqlite) {
+    await runSqlite(
+      'UPDATE counters SET currentNumber = ? WHERE scope = ? AND section IS ?;',
+      [highestMC, 'MC', null]
+    );
+    await runSqlite(
+      'UPDATE counters SET currentNumber = ? WHERE scope = ? AND section = ?;',
+      [highestSection, 'SECTION', section]
+    );
+  } else {
+    await pgPool.query(
+      'UPDATE counters SET "currentNumber" = $1 WHERE scope = $2 AND section IS NULL;',
+      [highestMC, 'MC']
+    );
+    await pgPool.query(
+      'UPDATE counters SET "currentNumber" = $1 WHERE scope = $2 AND section = $3;',
+      [highestSection, 'SECTION', section]
+    );
+  }
+
+  return { highestMC, highestSection };
+}
+
+async function validateControlNumbers(section, dateReceived) {
+  let records;
+  if (isSqlite) {
+    records = await allSqlite(
+      'SELECT id, mcCtrlNo, sectionCtrlNo FROM records WHERE section = ? AND dateReceived = ? ORDER BY id;',
+      [section, dateReceived]
+    );
+  } else {
+    const result = await pgPool.query(
+      'SELECT id, "mcCtrlNo", "sectionCtrlNo" FROM records WHERE section = $1 AND "dateReceived" = $2 ORDER BY id;',
+      [section, dateReceived]
+    );
+    records = result.rows;
+  }
+
+  const mcNumbers = new Set();
+  const sectionNumbers = new Set();
+  const duplicates = [];
+  const issues = [];
+
+  records.forEach(record => {
+    const mcCtrlNo = isSqlite ? record.mcCtrlNo : record.mcCtrlNo;
+    const sectionCtrlNo = isSqlite ? record.sectionCtrlNo : record.sectionCtrlNo;
+
+    // Check for duplicates
+    if (mcCtrlNo) {
+      if (mcNumbers.has(mcCtrlNo)) {
+        duplicates.push({ type: 'MC', controlNumber: mcCtrlNo, recordId: record.id });
+      }
+      mcNumbers.add(mcCtrlNo);
+    }
+
+    if (sectionCtrlNo) {
+      if (sectionNumbers.has(sectionCtrlNo)) {
+        duplicates.push({ type: 'SECTION', controlNumber: sectionCtrlNo, recordId: record.id });
+      }
+      sectionNumbers.add(sectionCtrlNo);
+    }
+  });
+
+  // Check for missing numbers (gaps in sequence)
+  const extractSequence = (controlNumber, pattern) => {
+    const match = controlNumber.match(pattern);
+    return match ? parseInt(match[2], 10) : null;
+  };
+
+  const mcSequences = Array.from(mcNumbers)
+    .map(cn => extractSequence(cn, /-MC-(\d+)-(\d+)$/))
+    .filter(n => n !== null)
+    .sort((a, b) => a - b);
+
+  const sectionSequences = Array.from(sectionNumbers)
+    .map(cn => extractSequence(cn, /-(\d+)-(\d+)$/))
+    .filter(n => n !== null)
+    .sort((a, b) => a - b);
+
+  // Find gaps in MC sequences
+  for (let i = 0; i < mcSequences.length - 1; i++) {
+    if (mcSequences[i + 1] - mcSequences[i] > 1) {
+      for (let missing = mcSequences[i] + 1; missing < mcSequences[i + 1]; missing++) {
+        issues.push({ type: 'MC', message: `Missing control number sequence: ${missing}` });
+      }
+    }
+  }
+
+  // Find gaps in Section sequences
+  for (let i = 0; i < sectionSequences.length - 1; i++) {
+    if (sectionSequences[i + 1] - sectionSequences[i] > 1) {
+      for (let missing = sectionSequences[i] + 1; missing < sectionSequences[i + 1]; missing++) {
+        issues.push({ type: 'SECTION', message: `Missing control number sequence: ${missing}` });
+      }
+    }
+  }
+
+  return {
+    duplicates,
+    issues,
+    hasProblems: duplicates.length > 0 || issues.length > 0
+  };
+}
+
+async function createUser({ username, password, role, section }) {
+  const now = new Date().toISOString();
+  if (isSqlite) {
+    const insert = await runSqlite(
+      'INSERT INTO users (username, password, role, section, isActive, createdAt, updatedAt) VALUES (?, ?, ?, ?, 1, ?, ?);',
+      [username, password, role, section, now, now]
+    );
+    return await getUserById(insert.lastID);
+  }
+  const insert = await pgPool.query(
+    'INSERT INTO users (username, password, role, section, isActive, createdAt, updatedAt) VALUES ($1, $2, $3, $4, TRUE, $5, $6) RETURNING *;',
+    [username, password, role, section, now, now]
+  );
+  return insert.rows[0];
+}
+
+async function getUserByUsername(username) {
+  if (isSqlite) {
+    return await getSqlite('SELECT * FROM users WHERE username = ? AND isActive = 1;', [username]);
+  }
+  const result = await pgPool.query('SELECT * FROM users WHERE username = $1 AND isActive = TRUE;', [username]);
+  return result.rows[0];
+}
+
+async function getUserById(id) {
+  if (isSqlite) {
+    return await getSqlite('SELECT * FROM users WHERE id = ?;', [id]);
+  }
+  const result = await pgPool.query('SELECT * FROM users WHERE id = $1;', [id]);
+  return result.rows[0];
+}
+
+async function listUsers() {
+  if (isSqlite) {
+    return await allSqlite('SELECT id, username, role, section, isActive FROM users ORDER BY username ASC;');
+  }
+  const result = await pgPool.query('SELECT id, username, role, section, isActive FROM users ORDER BY username ASC;');
+  return result.rows;
+}
+
+async function updateUser(id, { password, role, section, isActive }) {
+  const now = new Date().toISOString();
+  const updates = [];
+  const params = [];
+  
+  if (password !== undefined) {
+    updates.push(isSqlite ? 'password = ?' : `password = $${params.length + 1}`);
+    params.push(password);
+  }
+  if (role !== undefined) {
+    updates.push(isSqlite ? 'role = ?' : `role = $${params.length + 1}`);
+    params.push(role);
+  }
+  if (section !== undefined) {
+    updates.push(isSqlite ? 'section = ?' : `section = $${params.length + 1}`);
+    params.push(section);
+  }
+  if (isActive !== undefined) {
+    updates.push(isSqlite ? 'isActive = ?' : `isActive = $${params.length + 1}`);
+    params.push(isActive);
+  }
+  
+  if (updates.length === 0) return await getUserById(id);
+  
+  updates.push(isSqlite ? 'updatedAt = ?' : `updatedAt = $${params.length + 1}`);
+  params.push(now);
+  params.push(id);
+  
+  if (isSqlite) {
+    await runSqlite(`UPDATE users SET ${updates.join(', ')} WHERE id = ?;`, params);
+    return await getUserById(id);
+  }
+  
+  const result = await pgPool.query(
+    `UPDATE users SET ${updates.join(', ')} WHERE id = $${params.length} RETURNING *;`,
+    params
+  );
+  return result.rows[0];
+}
+
 module.exports = {
   db: {
     createRecord,
@@ -452,8 +780,15 @@ module.exports = {
     updateRecord,
     updateRecordFile,
     deleteRecord,
+    resetCountersForSection,
+    validateControlNumbers,
     getNextCounter,
     getNextCounterPreview,
+    createUser,
+    getUserByUsername,
+    getUserById,
+    listUsers,
+    updateUser,
   },
   initDb,
   isSqlite,
