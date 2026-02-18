@@ -280,14 +280,14 @@ async function createRecord(payload) {
 async function listRecords(filters = {}) {
   const { section } = filters;
   if (isSqlite) {
-    if (section) return await allSqlite('SELECT * FROM records WHERE section = ? ORDER BY id DESC;', [section]);
-    return await allSqlite('SELECT * FROM records ORDER BY id DESC;');
+    if (section) return await allSqlite('SELECT * FROM records WHERE section = ? ORDER BY dateReceived ASC;', [section]);
+    return await allSqlite('SELECT * FROM records ORDER BY dateReceived ASC;');
   }
   if (section) {
-    const result = await pgPool.query('SELECT * FROM records WHERE section = $1 ORDER BY id DESC;', [section]);
+    const result = await pgPool.query('SELECT * FROM records WHERE section = $1 ORDER BY dateReceived ASC;', [section]);
     return result.rows;
   }
-  const result = await pgPool.query('SELECT * FROM records ORDER BY id DESC;');
+  const result = await pgPool.query('SELECT * FROM records ORDER BY dateReceived ASC;');
   return result.rows;
 }
 
