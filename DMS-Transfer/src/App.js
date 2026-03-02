@@ -391,7 +391,7 @@ function App() {
     });
 
     newSocket.on('connect', () => {
-      console.log('🟢 Connected to real-time server');
+      console.log('Connected to real-time server');
     });
 
     newSocket.on('connect_error', (error) => {
@@ -399,7 +399,7 @@ function App() {
     });
 
     newSocket.on('disconnect', (reason) => {
-      console.log('🔴 Disconnected from real-time server:', reason);
+      console.log('Disconnected from real-time server:', reason);
     });
 
     // Listen for record created by other users
@@ -409,13 +409,13 @@ function App() {
         return;
       }
       
-      console.log('📝 New record created:', newRecord.mcCtrlNo);
+      console.log('New record created:', newRecord.mcCtrlNo);
       setRecords((prev) => {
         // Check if record already exists (avoid duplicates)
         if (prev.some(r => r.id === newRecord.id)) {
           return prev;
         }
-        showToast('success', '📝 New Record', `${newRecord.mcCtrlNo} was created`);
+        showToast('success', 'New Record', `${newRecord.mcCtrlNo} was created`);
         return [newRecord, ...prev];
       });
     });
@@ -427,10 +427,10 @@ function App() {
         return;
       }
       
-      console.log('✏️ Record updated:', updatedRecord.mcCtrlNo);
+      console.log('Record updated:', updatedRecord.mcCtrlNo);
       setRecords((prev) => {
         const updated = prev.map((r) => (r.id === updatedRecord.id ? updatedRecord : r));
-        showToast('info', '✏️ Record Updated', `${updatedRecord.mcCtrlNo} was modified`);
+        showToast('info', 'Record Updated', `${updatedRecord.mcCtrlNo} was modified`);
         return updated;
       });
     });
@@ -442,11 +442,11 @@ function App() {
         return;
       }
       
-      console.log('🗑️ Record deleted:', id);
+      console.log('Record deleted:', id);
       setRecords((prev) => {
         const deleted = prev.find((r) => r.id === id);
         if (deleted) {
-          showToast('warning', '🗑️ Record Deleted', `${deleted.mcCtrlNo || 'Record'} was removed`);
+          showToast('warning', 'Record Deleted', `${deleted.mcCtrlNo || 'Record'} was removed`);
         }
         return prev.filter((r) => r.id !== id);
       });
@@ -878,7 +878,7 @@ function App() {
       // Handle version conflict specifically
       if (error.message.includes('modified by another user') || error.message.includes('VERSION_CONFLICT')) {
         const confirmRefresh = window.confirm(
-          '⚠️ Conflict Detected!\\n\\n' +
+          'Conflict Detected!\\n\\n' +
           'This record was modified by another user while you were editing.\\n\\n' +
           'Click OK to reload the latest version and try again.\\n' +
           'Click Cancel to close without saving.'
@@ -1829,7 +1829,25 @@ function App() {
       <div className="toast-container">
         {toasts.map((toast) => (
           <div key={toast.id} className={`toast toast--${toast.type}`}>
-            <div className="toast__icon">{toast.type === 'success' ? '✅' : toast.type === 'info' ? 'ℹ️' : toast.type === 'warning' ? '⚠️' : '❌'}</div>
+            <div className="toast__icon">
+              {toast.type === 'success' ? (
+                <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+                  <path d="M7.7 13.3 4.4 10l1.2-1.2 2.1 2.1 6.7-6.7L15.6 5l-7.9 8.3Z" fill="currentColor" />
+                </svg>
+              ) : toast.type === 'info' ? (
+                <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+                  <path d="M9 8h2v7H9V8Zm0-3h2v2H9V5Z" fill="currentColor" />
+                </svg>
+              ) : toast.type === 'warning' ? (
+                <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+                  <path d="M9 6h2v6H9V6Zm0 7h2v2H9v-2Z" fill="currentColor" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+                  <path d="M6.4 5 5 6.4 8.6 10 5 13.6 6.4 15l3.6-3.6 3.6 3.6 1.4-1.4-3.6-3.6L15 6.4 13.6 5 10 8.6 6.4 5Z" fill="currentColor" />
+                </svg>
+              )}
+            </div>
             <div className="toast__content">
               <div className="toast__title">{toast.title}</div>
               <div className="toast__message">{toast.message}</div>

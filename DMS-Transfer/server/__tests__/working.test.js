@@ -48,7 +48,7 @@ describe('DMS Working API Tests', () => {
     }
   });
 
-  describe('✅ AUTHENTICATION', () => {
+  describe('AUTHENTICATION', () => {
     test('POST /auth/login - should login successfully', async () => {
       const response = await request(app)
         .post('/auth/login')
@@ -85,7 +85,7 @@ describe('DMS Working API Tests', () => {
     });
   });
 
-  describe('✅ USERS (Limited)', () => {
+  describe('USERS (Limited)', () => {
     test('GET /users/me - should return current user', async () => {
       const response = await request(app)
         .get('/users/me')
@@ -105,7 +105,7 @@ describe('DMS Working API Tests', () => {
     });
   });
 
-  describe('✅ RECORDS CRUD', () => {
+  describe('RECORDS CRUD', () => {
     test('POST /records - should create new record', async () => {
       const newRecord = {
         section: 'INVES',
@@ -203,7 +203,7 @@ describe('DMS Working API Tests', () => {
     });
   });
 
-  describe('✅ OTHER ENDPOINTS', () => {
+  describe('OTHER ENDPOINTS', () => {
     test('GET /sections - should return sections list', async () => {
       const response = await request(app)
         .get('/sections');
@@ -223,7 +223,7 @@ describe('DMS Working API Tests', () => {
     });
   });
 
-  describe('✅ SECURITY', () => {
+  describe('SECURITY', () => {
     test('Protected routes should reject requests without token', async () => {
       const response = await request(app)
         .get('/records');

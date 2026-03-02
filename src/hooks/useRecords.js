@@ -102,7 +102,7 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
       if (newRecord._actionBy === currentUser?.username) return;
       setRecords((prev) => {
         if (prev.some((r) => r.id === newRecord.id)) return prev;
-        showToast('success', '📝 New Record', `${newRecord.mcCtrlNo} was created`);
+        showToast('success', 'New Record', `${newRecord.mcCtrlNo} was created`);
         return sortRecords([...prev, newRecord]);
       });
     });
@@ -111,7 +111,7 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
       const isOwn = updated._actionBy === currentUser?.username;
       setRecords((prev) => {
         const next = sortRecords(prev.map((r) => (r.id === updated.id ? updated : r)));
-        if (!isOwn) showToast('info', '✏️ Record Updated', `${updated.mcCtrlNo} was modified`);
+        if (!isOwn) showToast('info', 'Record Updated', `${updated.mcCtrlNo} was modified`);
         return next;
       });
     });
@@ -120,7 +120,7 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
       if (_actionBy === currentUser?.username) return;
       setRecords((prev) => {
         const deleted = prev.find((r) => r.id === id);
-        if (deleted) showToast('warning', '🗑️ Record Deleted', `${deleted.mcCtrlNo || 'Record'} was removed`);
+        if (deleted) showToast('warning', 'Record Deleted', `${deleted.mcCtrlNo || 'Record'} was removed`);
         return prev.filter((r) => r.id !== id);
       });
     });
@@ -204,7 +204,7 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
         body: JSON.stringify({ ...payload, fromValue: resolvedFrom, createdBy: currentUser.username }),
       });
       setRecords((prev) => sortRecords([...prev, created]));
-      showToast('success', '✅ Record Saved', `${created.mcCtrlNo} was created`);
+      showToast('success', 'Record Saved', `${created.mcCtrlNo} was created`);
 
       if (subjectFile) {
         const formData = new FormData();
@@ -289,7 +289,7 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
     } catch (error) {
       if (error.message.includes('modified by another user') || error.message.includes('VERSION_CONFLICT')) {
         const ok = window.confirm(
-          '⚠️ Conflict Detected!\n\nThis record was modified by another user.\n\nClick OK to reload the latest version.\nClick Cancel to close without saving.'
+          'Conflict Detected!\n\nThis record was modified by another user.\n\nClick OK to reload the latest version.\nClick Cancel to close without saving.'
         );
         if (ok) {
           try {

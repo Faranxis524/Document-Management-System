@@ -26,10 +26,10 @@ async function test() {
   console.log('Body:', response.body);
   
   if (response.status === 200) {
-    console.log('\n✅ Login successful!');
+    console.log('\nLogin successful!');
     console.log('Token:', response.body.token?.substring(0, 20) + '...');
   } else {
-    console.log('\n❌ Login failed!');
+    console.log('\nLogin failed!');
   }
   
   server.close();

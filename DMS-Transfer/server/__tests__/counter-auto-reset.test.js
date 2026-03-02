@@ -107,7 +107,7 @@ describe('Counter Auto-Reset on Empty Database', () => {
     expect(newRecord.body.sectionCtrlNo).toBe('RFU4A-INVES-260218-01');
     expect(newRecord.body.mcCtrlNo).toBe('RFU4A-MC-260218-01');
     
-    console.log('✅ Counter successfully reset to 01 after deleting all records');
+    console.log('Counter successfully reset to 01 after deleting all records');
   });
 
   test('should handle partial deletion correctly', async () => {
@@ -153,7 +153,7 @@ describe('Counter Auto-Reset on Empty Database', () => {
     expect(newRecord.status).toBe(200);
     expect(newRecord.body.sectionCtrlNo).toBe('RFU4A-INTEL-260218-06');
     
-    console.log('✅ Counter correctly continued from highest existing record');
+    console.log('Counter correctly continued from highest existing record');
   });
 
   test('should work when records exist but counter is too high', async () => {
@@ -193,6 +193,6 @@ describe('Counter Auto-Reset on Empty Database', () => {
     expect(response2.status).toBe(200);
     expect(response2.body.sectionCtrlNo).toBe('RFU4A-OPN-260218-02');
     
-    console.log('✅ Sequential numbering maintained correctly');
+    console.log('Sequential numbering maintained correctly');
   });
 });

@@ -21,7 +21,7 @@ if (fs.existsSync(testDbPath)) {
 }
 
 async function runTest() {
-  console.log('\n🔧 Starting Direct Authentication Test\n');
+  console.log('\nStarting Direct Authentication Test\n');
   console.log('Environment:');
   console.log('  NODE_ENV:', process.env.NODE_ENV);
   console.log('  DB_PATH:', process.env.DB_PATH);
@@ -34,7 +34,7 @@ async function runTest() {
 
   console.log('Starting server...');
   const server = await startServer();
-  console.log('✓ Server started\n');
+  console.log('Server started\n');
 
   // Wait for database seeding
   await new Promise(resolve => setTimeout(resolve, 1500));
@@ -44,12 +44,12 @@ async function runTest() {
   const { db } = require('./lib/db');
   const adminUser = await db.getUserByUsername('admin');
   if (adminUser) {
-    console.log('✓ Admin user found in database');
+    console.log('Admin user found in database');
     console.log('  Username:', adminUser.username);
     console.log('  Role:', adminUser.role);
     console.log('  Has password hash:', !!adminUser.password);
   } else {
-    console.log('✗ Admin user NOT found in database!');
+    console.log('Admin user NOT found in database!');
     process.exit(1);
   }
   console.log('');
@@ -67,7 +67,7 @@ async function runTest() {
   console.log('  Body:', JSON.stringify(loginResponse.body, null, 2));
 
   if (loginResponse.status === 200) {
-    console.log('✓ Login successful!');
+    console.log('Login successful!');
     const token = loginResponse.body.token;
     console.log('  Token (first 30 chars):', token?.substring(0, 30) + '...');
     console.log('');
@@ -80,14 +80,14 @@ async function runTest() {
 
     console.log('  Status:', verifyResponse.status);
     if (verifyResponse.status === 200) {
-      console.log('✓ Token verification successful!');
+      console.log('Token verification successful!');
       console.log('  User:', verifyResponse.body.user.username);
     } else {
-      console.log('✗ Token verification failed!');
+      console.log('Token verification failed!');
       console.log('  Body:', verifyResponse.body);
     }
   } else {
-    console.log('✗ Login failed!');
+    console.log('Login failed!');
     console.log('  Expected: 200');
     console.log('  Received:', loginResponse.status);
   }
@@ -105,9 +105,9 @@ async function runTest() {
 
   console.log('  Status:', wrongPassResponse.status);
   if (wrongPassResponse.status === 401) {
-    console.log('✓ Wrong password correctly rejected');
+    console.log('Wrong password correctly rejected');
   } else {
-    console.log('✗ Wrong password not rejected properly');
+    console.log('Wrong password not rejected properly');
   }
 
   console.log('');
@@ -120,7 +120,7 @@ async function runTest() {
     setTimeout(() => {
       if (fs.existsSync(testDbPath)) {
         fs.unlinkSync(testDbPath);
-        console.log('\n✓ Test database cleaned up');
+        console.log('\nTest database cleaned up');
       }
       process.exit(0);
     }, 200);
@@ -128,7 +128,7 @@ async function runTest() {
 }
 
 runTest().catch(error => {
-  console.error('\n❌ Test failed with error:');
+  console.error('\nTest failed with error:');
   console.error(error);
   process.exit(1);
 });

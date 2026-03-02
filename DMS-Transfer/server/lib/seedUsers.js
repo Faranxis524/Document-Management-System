@@ -30,12 +30,12 @@ async function seedUsers() {
           role: user.role,
           section: user.section,
         });
-        console.log(`✓ Created user: ${user.username}`);
+        console.log(`Created user: ${user.username}`);
       } else {
         console.log(`- User already exists: ${user.username}`);
       }
     } catch (error) {
-      console.error(`✗ Failed to create user ${user.username}:`, error.message);
+      console.error(`Failed to create user ${user.username}:`, error.message);
     }
   }
   

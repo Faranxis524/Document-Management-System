@@ -35,7 +35,7 @@ class ErrorBoundary extends React.Component {
             maxWidth: '600px',
             textAlign: 'center'
           }}>
-            <h1 style={{ color: '#e74c3c', marginBottom: '20px' }}>⚠️ Something went wrong</h1>
+            <h1 style={{ color: '#e74c3c', marginBottom: '20px' }}>Something went wrong</h1>
             <p style={{ marginBottom: '20px', color: '#555' }}>
               The application encountered an unexpected error. Please try refreshing the page.
             </p>
