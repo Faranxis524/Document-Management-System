@@ -158,8 +158,7 @@ function signToken(user) {
 function authMiddleware(req, res, next) {
   const auth = req.headers.authorization || '';
   const bearerToken = auth.replace('Bearer ', '');
-  const queryToken = typeof req.query?.token === 'string' ? req.query.token : '';
-  const token = bearerToken || queryToken;
+  const token = bearerToken;
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   try {
     req.user = jwt.verify(token, jwtSecret);
@@ -240,12 +239,8 @@ function validateDates(payload) {
     errors.push('Date received must be in YYYY-MM-DD format');
   }
   
-  if (targetDate && !/^\d{4}-\d{2}-\d{2}$/.test(targetDate) && targetDate !== '') {
-    // Allow empty or valid date format
-    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
-    if (!datePattern.test(targetDate)) {
-      errors.push('Target date must be in YYYY-MM-DD format or a text description');
-    }
+  if (targetDate && !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+    errors.push('Target date must be in YYYY-MM-DD format');
   }
   
   if (dateSent && !/^\d{4}-\d{2}-\d{2}$/.test(dateSent) && dateSent !== '') {

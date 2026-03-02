@@ -20,6 +20,7 @@ export function useFilters({ records, currentUser, isMc, activeSection }) {
   useEffect(() => { localStorage.setItem('dms_dateTo', dateTo); }, [dateTo]);
 
   const clearFilters = () => {
+    setSearch('');
     setFilterAction('ALL');
     setFilterSection('ALL');
     setFilterMonth('');
