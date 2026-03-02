@@ -54,13 +54,19 @@ export function useAuth() {
    * onSuccess(token, user) is called on success so callers can react.
    */
   const login = async (onSuccess) => {
+    const trimmedUsername = username.trim();
+    if (!trimmedUsername || !loginPassword) {
+      setApiError('Username and password are required');
+      return;
+    }
+
     setApiError('');
     setIsLoading(true);
     try {
       const response = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim(), password: loginPassword }),
+        body: JSON.stringify({ username: trimmedUsername, password: loginPassword }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Login failed');

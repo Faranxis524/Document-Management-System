@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import { API_BASE } from '../constants';
 import { makeApiFetch } from '../utils';
 
 export function useUsers({ authToken, showToast }) {
@@ -11,7 +10,7 @@ export function useUsers({ authToken, showToast }) {
     setIsLoading(true);
     try {
       const apiFetch = makeApiFetch(authToken);
-      const data = await apiFetch(`${API_BASE}/users`);
+      const data = await apiFetch('/users');
       setUsers(data.users || []);
     } catch (err) {
       showToast('error', 'Error', err.message);
@@ -23,7 +22,7 @@ export function useUsers({ authToken, showToast }) {
   const createUser = useCallback(
     async ({ username, password, role, section }) => {
       const apiFetch = makeApiFetch(authToken);
-      const data = await apiFetch(`${API_BASE}/users`, {
+      const data = await apiFetch('/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password, role, section }),
@@ -40,7 +39,7 @@ export function useUsers({ authToken, showToast }) {
   const updateUser = useCallback(
     async (id, fields) => {
       const apiFetch = makeApiFetch(authToken);
-      const data = await apiFetch(`${API_BASE}/users/${id}`, {
+      const data = await apiFetch(`/users/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(fields),
@@ -55,7 +54,7 @@ export function useUsers({ authToken, showToast }) {
   const deleteUser = useCallback(
     async (id, username) => {
       const apiFetch = makeApiFetch(authToken);
-      await apiFetch(`${API_BASE}/users/${id}`, { method: 'DELETE' });
+      await apiFetch(`/users/${id}`, { method: 'DELETE' });
       setUsers((prev) => prev.filter((u) => u.id !== id));
       showToast('success', 'User Deleted', `${username} has been removed`);
     },
