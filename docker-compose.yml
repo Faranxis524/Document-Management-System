@@ -1,0 +1,36 @@
+# Docker Compose – one-command web deployment (no Electron EXE needed)
+#
+# Usage:
+#   docker compose up -d          # start (or update) the server
+#   docker compose down           # stop
+#   docker compose logs -f        # stream logs
+#
+# After a code change just run: docker compose up -d --build
+# Data (database + uploaded files) persists in Docker named volumes across updates.
+#
+# Access the app from any device on the same network:
+#   http://<SERVER_IP>:5000
+
+services:
+  dms:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      # Generate a strong secret: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+      - JWT_SECRET=${JWT_SECRET:-REPLACE_THIS_WITH_A_STRONG_RANDOM_SECRET}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
+      - DB_MODE=sqlite
+      - SQLITE_PATH=./data/dms.sqlite
+      - UPLOAD_DIR=./uploads
+      - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-50}
+    volumes:
+      # Persist database and uploaded files across container rebuilds
+      - dms-data:/app/server/data
+      - dms-uploads:/app/server/uploads
+
+volumes:
+  dms-data:
+  dms-uploads:

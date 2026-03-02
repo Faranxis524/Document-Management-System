@@ -1,0 +1,13 @@
+node_modules
+server/node_modules
+build
+release
+release2
+release3
+.git
+.env
+.env.*
+*.log
+*.zip
+*.exe
+*.asar
