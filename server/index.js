@@ -1020,6 +1020,10 @@ async function startServer() {
   await seedUsers();
   const port = Number(process.env.PORT || 5000);
   const host = '0.0.0.0'; // Listen on all network interfaces
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean)
+    : ['http://localhost:3000', 'http://localhost:5000'];
+  const networkOrigin = allowedOrigins.find((origin) => !origin.includes('localhost')) || `http://localhost:${port}`;
   
   // Serve React build files in production (after all API routes)
   const buildPath = path.join(__dirname, '..', 'build');
@@ -1050,18 +1054,13 @@ async function startServer() {
   server = app.listen(port, host, () => {
     console.log(`API listening on ${host}:${port} using ${isSqlite ? 'SQLite' : 'Postgres'}`);
     console.log(`Local:   http://localhost:${port}`);
-    console.log(`Network: http://10.42.11.207:${port}`);
+    console.log(`Network: ${networkOrigin}`);
   });
   
   // Initialize Socket.IO
   io = new Server(server, {
     cors: {
-      origin: process.env.ALLOWED_ORIGINS?.split(',') || [
-        'http://localhost:3000',
-        'http://localhost:5000',
-        'http://192.168.254.193:5000',
-        'http://10.42.11.207:5000'  // ZeroTier IP
-      ],
+      origin: allowedOrigins,
       credentials: true
     }
   });
