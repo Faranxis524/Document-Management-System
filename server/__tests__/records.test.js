@@ -61,7 +61,7 @@ describe('Records API', () => {
         subjectText: 'Employee Request',
         fromValue: 'IND',
         targetDate: '2026-03-01',
-        receivedBy: 'NUP TALA',
+        receivedBy: 'NUP Tala',
         actionTaken: 'DRAFTED',
         concernedUnits: 'IND'
       };
@@ -113,7 +113,7 @@ describe('Records API', () => {
           subjectText: 'Auto ctrl test',
           fromValue: 'IND',
           targetDate: '2026-03-01',
-          receivedBy: 'NUP TALA',
+          receivedBy: 'NUP Tala',
           actionTaken: 'DRAFTED',
           concernedUnits: 'IND'
         });

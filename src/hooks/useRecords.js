@@ -102,7 +102,8 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
       if (newRecord._actionBy === currentUser?.username) return;
       setRecords((prev) => {
         if (prev.some((r) => r.id === newRecord.id)) return prev;
-        showToast('success', 'New Record', `${newRecord.mcCtrlNo} was created`);
+        const actor = newRecord._actionBy || 'another user';
+        showToast('success', 'New Record', `${newRecord.mcCtrlNo} was created by ${actor}`);
         return sortRecords([...prev, newRecord]);
       });
     });
@@ -111,7 +112,10 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
       const isOwn = updated._actionBy === currentUser?.username;
       setRecords((prev) => {
         const next = sortRecords(prev.map((r) => (r.id === updated.id ? updated : r)));
-        if (!isOwn) showToast('info', 'Record Updated', `${updated.mcCtrlNo} was modified`);
+        if (!isOwn) {
+          const actor = updated._actionBy || 'another user';
+          showToast('info', 'Record Updated', `${updated.mcCtrlNo} was modified by ${actor}`);
+        }
         return next;
       });
     });
@@ -120,7 +124,10 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
       if (_actionBy === currentUser?.username) return;
       setRecords((prev) => {
         const deleted = prev.find((r) => r.id === id);
-        if (deleted) showToast('warning', 'Record Deleted', `${deleted.mcCtrlNo || 'Record'} was removed`);
+        if (deleted) {
+          const actor = _actionBy || 'another user';
+          showToast('warning', 'Record Deleted', `${deleted.mcCtrlNo || 'Record'} was removed by ${actor}`);
+        }
         return prev.filter((r) => r.id !== id);
       });
     });

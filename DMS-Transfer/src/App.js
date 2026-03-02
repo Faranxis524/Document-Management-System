@@ -55,7 +55,7 @@ const DEFAULT_FROM = {
 };
 
 const RECEIVED_BY = {
-  INVES: ['NUP TALA'],
+  INVES: ['NUP Tala'],
   OPN: ['NUP Aldrin', 'PCPL Bueno', 'PAT Duyag'],
   INTEL: ['NUP Joyce', 'PCPL Jose'],
   ADM: ['NUP San Pedro', 'PMSG Foncardas'],
@@ -415,7 +415,8 @@ function App() {
         if (prev.some(r => r.id === newRecord.id)) {
           return prev;
         }
-        showToast('success', 'New Record', `${newRecord.mcCtrlNo} was created`);
+        const actor = newRecord._actionBy || 'another user';
+        showToast('success', 'New Record', `${newRecord.mcCtrlNo} was created by ${actor}`);
         return [newRecord, ...prev];
       });
     });
@@ -430,7 +431,8 @@ function App() {
       console.log('Record updated:', updatedRecord.mcCtrlNo);
       setRecords((prev) => {
         const updated = prev.map((r) => (r.id === updatedRecord.id ? updatedRecord : r));
-        showToast('info', 'Record Updated', `${updatedRecord.mcCtrlNo} was modified`);
+        const actor = updatedRecord._actionBy || 'another user';
+        showToast('info', 'Record Updated', `${updatedRecord.mcCtrlNo} was modified by ${actor}`);
         return updated;
       });
     });
@@ -446,7 +448,8 @@ function App() {
       setRecords((prev) => {
         const deleted = prev.find((r) => r.id === id);
         if (deleted) {
-          showToast('warning', 'Record Deleted', `${deleted.mcCtrlNo || 'Record'} was removed`);
+          const actor = _actionBy || 'another user';
+          showToast('warning', 'Record Deleted', `${deleted.mcCtrlNo || 'Record'} was removed by ${actor}`);
         }
         return prev.filter((r) => r.id !== id);
       });

@@ -101,7 +101,7 @@ const DEFAULT_FROM = {
 };
 
 const DEFAULT_RECEIVED_BY = {
-  INVES: ['NUP TALA'],
+  INVES: ['NUP Tala'],
   OPN: ['NUP Aldrin', 'PCPL Bueno', 'PAT Duyag'],
   INTEL: ['NUP Joyce', 'PCPL Jose'],
   ADM: ['NUP San Pedro', 'PMSG Foncardas'],
