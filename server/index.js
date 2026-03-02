@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
@@ -38,9 +39,13 @@ app.use(helmet({
 }));
 
 // CORS Configuration
+// ALLOWED_ORIGINS=* permits any origin (handy for self-hosted LAN/ZeroTier deployments)
+const _allowedOrigins = process.env.ALLOWED_ORIGINS === '*'
+  ? '*'
+  : process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'];
 const corsOptions = {
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
-  credentials: true,
+  origin: _allowedOrigins,
+  credentials: _allowedOrigins === '*' ? false : true,
   optionsSuccessStatus: 200
 };
 app.use(cors(corsOptions));
@@ -125,11 +130,12 @@ const upload = multer({
 const jwtSecret = process.env.JWT_SECRET || 'change-me';
 
 // Safety guard: refuse to start with the default insecure secret in production
-if (process.env.NODE_ENV === 'production' && jwtSecret === 'change-me') {
+const _insecureSecrets = new Set(['change-me', 'REPLACE_THIS_WITH_A_STRONG_RANDOM_SECRET']);
+if (process.env.NODE_ENV === 'production' && _insecureSecrets.has(jwtSecret)) {
   console.error('FATAL: JWT_SECRET is not set. Set a strong secret in your .env file before running in production.');
   process.exit(1);
 }
-if (jwtSecret === 'change-me') {
+if (_insecureSecrets.has(jwtSecret)) {
   console.warn('WARNING: JWT_SECRET is using the default insecure value. Set JWT_SECRET in your .env file.');
 }
 
@@ -1050,19 +1056,22 @@ async function startServer() {
   server = app.listen(port, host, () => {
     console.log(`API listening on ${host}:${port} using ${isSqlite ? 'SQLite' : 'Postgres'}`);
     console.log(`Local:   http://localhost:${port}`);
-    console.log(`Network: http://10.42.11.207:${port}`);
+    // Detect and print all non-loopback IPv4 addresses for easy LAN/ZeroTier access
+    const nets = os.networkInterfaces();
+    for (const iface of Object.values(nets)) {
+      for (const addr of iface) {
+        if (addr.family === 'IPv4' && !addr.internal) {
+          console.log(`Network: http://${addr.address}:${port}`);
+        }
+      }
+    }
   });
   
   // Initialize Socket.IO
   io = new Server(server, {
     cors: {
-      origin: process.env.ALLOWED_ORIGINS?.split(',') || [
-        'http://localhost:3000',
-        'http://localhost:5000',
-        'http://192.168.254.193:5000',
-        'http://10.42.11.207:5000'  // ZeroTier IP
-      ],
-      credentials: true
+      origin: _allowedOrigins,
+      credentials: _allowedOrigins === '*' ? false : true
     }
   });
   
