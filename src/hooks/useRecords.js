@@ -204,6 +204,31 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
     setIsSaving(true);
     const apiFetch = makeApiFetch(authToken);
     try {
+      // ── Duplicate detection ──────────────────────────────────────────────
+      try {
+        const params = new URLSearchParams();
+        if (recordForm.subjectText) params.append('subjectText', recordForm.subjectText.trim());
+        if (recordForm.fromValue) params.append('fromValue', recordForm.fromValue);
+        if (recordForm.dateReceived) params.append('dateReceived', recordForm.dateReceived);
+        if (recordForm.section) params.append('section', recordForm.section);
+        const dupResult = await apiFetch(`/records/check-duplicate?${params.toString()}`);
+        if (dupResult.hasDuplicates && dupResult.matches.length > 0) {
+          const matchLines = dupResult.matches
+            .map((m) => `  • ${m.mcCtrlNo || `ID ${m.id}`} — "${m.subjectText}" (${m.dateReceived})`)
+            .join('\n');
+          const proceed = window.confirm(
+            `⚠️ Possible Duplicate Detected!\n\nAn existing record with the same subject was found:\n${matchLines}\n\nDo you still want to save this record?`
+          );
+          if (!proceed) {
+            setIsSaving(false);
+            return;
+          }
+        }
+      } catch {
+        // Duplicate-check errors are non-fatal — proceed with save
+      }
+      // ── End duplicate detection ──────────────────────────────────────────
+
       const { subjectFile, fromCustom: _fcNew, ...payload } = recordForm;
       const resolvedFrom = recordForm.fromValue === 'User Input' ? recordForm.fromCustom : recordForm.fromValue;
       const created = await apiFetch('/records', {

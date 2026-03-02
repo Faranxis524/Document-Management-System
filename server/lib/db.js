@@ -837,6 +837,50 @@ async function validateControlNumbers(section, dateReceived) {
   };
 }
 
+// ── Duplicate detection ────────────────────────────────────────────────────
+// Returns up to 5 records with the same subject text (case-insensitive)
+// within ±30 days of dateReceived in the same section.
+async function findDuplicates({ subjectText, fromValue, dateReceived, section, excludeId }) {
+  const normalizedSubject = (subjectText || '').trim().toLowerCase();
+  if (!normalizedSubject) return [];
+
+  let dateMin, dateMax;
+  if (dateReceived) {
+    const base = new Date(`${dateReceived}T00:00:00`);
+    if (!Number.isNaN(base.getTime())) {
+      const d1 = new Date(base); d1.setDate(d1.getDate() - 30);
+      const d2 = new Date(base); d2.setDate(d2.getDate() + 30);
+      dateMin = d1.toISOString().slice(0, 10);
+      dateMax = d2.toISOString().slice(0, 10);
+    }
+  }
+
+  if (isSqlite) {
+    let sql = `SELECT id, mcCtrlNo, sectionCtrlNo, subjectText, fromValue, dateReceived, section
+               FROM records WHERE LOWER(TRIM(subjectText)) = ?`;
+    const params = [normalizedSubject];
+    if (section) { sql += ' AND section = ?'; params.push(section); }
+    if (dateMin && dateMax) { sql += ' AND dateReceived >= ? AND dateReceived <= ?'; params.push(dateMin, dateMax); }
+    if (excludeId) { sql += ' AND id != ?'; params.push(excludeId); }
+    sql += ' ORDER BY dateReceived DESC LIMIT 5;';
+    return await allSqlite(sql, params);
+  }
+
+  let sql = `SELECT id, "mcCtrlNo", "sectionCtrlNo", "subjectText", "fromValue", "dateReceived", section
+             FROM records WHERE LOWER(TRIM("subjectText")) = $1`;
+  const params = [normalizedSubject];
+  let idx = 2;
+  if (section) { sql += ` AND section = $${idx}`; params.push(section); idx++; }
+  if (dateMin && dateMax) {
+    sql += ` AND "dateReceived" >= $${idx} AND "dateReceived" <= $${idx + 1}`;
+    params.push(dateMin, dateMax); idx += 2;
+  }
+  if (excludeId) { sql += ` AND id != $${idx}`; params.push(excludeId); }
+  sql += ' ORDER BY "dateReceived" DESC LIMIT 5;';
+  const result = await pgPool.query(sql, params);
+  return result.rows;
+}
+
 async function createUser({ username, password, role, section }) {
   const now = new Date().toISOString();
   if (isSqlite) {
@@ -1066,6 +1110,7 @@ module.exports = {
     getAllAuditLogs,
     clearAuditLogs,
     calculateStatus,
+    findDuplicates,
     closeDb,
   },
   initDb,

@@ -554,6 +554,28 @@ app.post('/records/reset-counters', authMiddleware, requireRole(['MC']), asyncHa
   });
 }));
 
+// Check for duplicate records before saving (same subject text within ±30 days)
+app.get('/records/check-duplicate', authMiddleware, asyncHandler(async (req, res) => {
+  const { subjectText, fromValue, dateReceived, section, excludeId } = req.query;
+
+  if (!subjectText || !subjectText.trim()) {
+    return res.json({ hasDuplicates: false, matches: [] });
+  }
+
+  // Section users can only check their own section
+  const resolvedSection = req.user.role === 'SECTION' ? req.user.section : (section || null);
+
+  const matches = await db.findDuplicates({
+    subjectText: subjectText.trim(),
+    fromValue,
+    dateReceived,
+    section: resolvedSection,
+    excludeId: excludeId ? Number(excludeId) : undefined,
+  });
+
+  return res.json({ hasDuplicates: matches.length > 0, matches });
+}));
+
 app.get('/records/:id', authMiddleware, async (req, res) => {
   const record = await db.getRecord(req.params.id);
   if (!record) return res.status(404).json({ error: 'Not found' });
