@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -43,6 +43,30 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
   const [editFormErrors, setEditFormErrors] = useState({});
   const [editFormErrorMessage, setEditFormErrorMessage] = useState('');
 
+  const refreshRecords = useCallback(
+    async (showFeedback = false) => {
+      if (!authToken) {
+        setRecords([]);
+        return;
+      }
+      setIsLoadingRecords(true);
+      try {
+        const data = await makeApiFetch(authToken)('/records');
+        setRecords(sortRecords(data.records || []));
+        if (showFeedback) {
+          showToast('info', 'Records Refreshed', 'Table has been updated from server.');
+        }
+      } catch (error) {
+        if (showFeedback) {
+          showToast('error', 'Refresh Failed', error.message);
+        }
+      } finally {
+        setIsLoadingRecords(false);
+      }
+    },
+    [authToken, showToast]
+  );
+
   // ── Ensure Received By is a real value ────────────────────────────────────
   // The <select> will *display* the first option even if state is "".
   // But validation checks state, so we must initialize it.
@@ -60,14 +84,8 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
 
   // ── Load records on login ──────────────────────────────────────────────────
   useEffect(() => {
-    if (!authToken) { setRecords([]); return; }
-    let active = true;
-    setIsLoadingRecords(true);
-    makeApiFetch(authToken)('/records')
-      .then((data) => { if (active) { setRecords(sortRecords(data.records || [])); setIsLoadingRecords(false); } })
-      .catch(() => { if (active) setIsLoadingRecords(false); });
-    return () => { active = false; };
-  }, [authToken]);
+    refreshRecords(false);
+  }, [refreshRecords]);
 
   // ── Real-time socket ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -433,5 +451,6 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
     handleExportPdf,
     handleExportCsv,
     handleExportExcel,
+    refreshRecords,
   };
 }

@@ -22,6 +22,8 @@ export default function Toolbar({
   handleExportPdf,
   handleExportCsv,
   handleExportExcel,
+  refreshRecords,
+  isLoadingRecords,
   // activity log filters
   activityLogSearch, setActivityLogSearch,
   activityLogActionFilter, setActivityLogActionFilter,
@@ -149,6 +151,9 @@ export default function Toolbar({
         </button>
         <button type="button" onClick={handleExportExcel}>
           Export (Excel)
+        </button>
+        <button type="button" onClick={() => refreshRecords(true)} disabled={isLoadingRecords}>
+          {isLoadingRecords ? 'Refreshing...' : 'Refresh'}
         </button>
       </div>
     </div>

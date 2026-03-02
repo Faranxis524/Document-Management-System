@@ -63,6 +63,7 @@ function App() {
     handleExportPdf,
     handleExportCsv,
     handleExportExcel,
+    refreshRecords,
   } = useRecords({ authToken, currentUser, isMc, showToast });
 
   const {
@@ -159,6 +160,8 @@ function App() {
               handleExportPdf={handleExportPdf}
               handleExportCsv={handleExportCsv}
               handleExportExcel={handleExportExcel}
+              refreshRecords={refreshRecords}
+              isLoadingRecords={isLoadingRecords}
               activityLogSearch={activityLogSearch}
               setActivityLogSearch={setActivityLogSearch}
               activityLogActionFilter={activityLogActionFilter}
