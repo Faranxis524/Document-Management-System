@@ -24,6 +24,7 @@ function App() {
   const [view, setView] = useState('login');
   const [activeSection, setActiveSection] = useState('MC Master List');
   const [isTableExpanded, setIsTableExpanded] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // ── Hooks ──────────────────────────────────────────────────────────────────
   const { toasts, showToast, dismissToast } = useToast();
@@ -70,6 +71,7 @@ function App() {
     search, setSearch,
     filterSection, setFilterSection,
     filterAction, setFilterAction,
+    filterStatus, setFilterStatus,
     filterMonth, setFilterMonth,
     filterYear, setFilterYear,
     dateFrom, setDateFrom,
@@ -148,12 +150,15 @@ function App() {
               search={search} setSearch={setSearch}
               filterSection={filterSection} setFilterSection={setFilterSection}
               filterAction={filterAction} setFilterAction={setFilterAction}
+              filterStatus={filterStatus} setFilterStatus={setFilterStatus}
               filterMonth={filterMonth} setFilterMonth={setFilterMonth}
+              totalRecords={records.length}
               filterYear={filterYear} setFilterYear={setFilterYear}
               dateFrom={dateFrom} setDateFrom={setDateFrom}
               dateTo={dateTo} setDateTo={setDateTo}
               isFiltered={isFiltered}
               clearFilters={clearFilters}
+              records={records}
               displayRecords={displayRecords}
               filterMonthForPdf={filterMonth}
               filterYearForPdf={filterYear}
@@ -162,6 +167,7 @@ function App() {
               handleExportExcel={handleExportExcel}
               refreshRecords={refreshRecords}
               isLoadingRecords={isLoadingRecords}
+              onNewRecord={() => setDrawerOpen(true)}
               activityLogSearch={activityLogSearch}
               setActivityLogSearch={setActivityLogSearch}
               activityLogActionFilter={activityLogActionFilter}
@@ -202,6 +208,8 @@ function App() {
                   </div>
 
                   <RecordForm
+                    isOpen={drawerOpen}
+                    onClose={() => setDrawerOpen(false)}
                     isMc={isMc}
                     recordForm={recordForm}
                     setRecordForm={setRecordForm}
@@ -209,7 +217,7 @@ function App() {
                     setFormErrors={setFormErrors}
                     formErrorMessage={formErrorMessage}
                     handleFieldChange={handleFieldChange}
-                    handleSaveRecord={handleSaveRecord}
+                    handleSaveRecord={(cb) => handleSaveRecord(cb)}
                     previewCtrlNumbers={previewCtrlNumbers}
                     isSaving={isSaving}
                   />

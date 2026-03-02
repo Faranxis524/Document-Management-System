@@ -1,6 +1,11 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { SECTIONS } from '../constants';
-import { toDisplayDate, toIsoDate } from '../utils';
+
+
+const MONTH_NAMES = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December',
+];
 
 export default function Toolbar({
   activeSection,
@@ -10,13 +15,17 @@ export default function Toolbar({
   search, setSearch,
   filterSection, setFilterSection,
   filterAction, setFilterAction,
+  filterStatus, setFilterStatus,
   filterMonth, setFilterMonth,
   filterYear, setFilterYear,
   dateFrom, setDateFrom,
   dateTo, setDateTo,
   isFiltered, clearFilters,
+  // all (unfiltered) records — used to build the year dropdown
+  records,
   // export handlers (receive displayRecords for PDF)
   displayRecords,
+  totalRecords,
   filterMonthForPdf,
   filterYearForPdf,
   handleExportPdf,
@@ -24,11 +33,22 @@ export default function Toolbar({
   handleExportExcel,
   refreshRecords,
   isLoadingRecords,
+  onNewRecord,
   // activity log filters
   activityLogSearch, setActivityLogSearch,
   activityLogActionFilter, setActivityLogActionFilter,
 }) {
   const currentYear = new Date().getFullYear();
+  // Build the year list from actual record data so it never goes stale.
+  // Always includes the current year even if no records exist yet.
+  const availableYears = useMemo(() => {
+    const yearSet = new Set([String(currentYear)]);
+    (records || []).forEach((r) => {
+      const y = (r.dateReceived || '').slice(0, 4);
+      if (y && /^\d{4}$/.test(y)) yearSet.add(y);
+    });
+    return Array.from(yearSet).sort((a, b) => Number(b) - Number(a)); // newest first
+  }, [records, currentYear]);
   // Debounced search: display typed characters instantly, but delay state update to avoid
   // recomputing displayRecords on every keystroke.
   const [searchLocal, setSearchLocal] = useState(search);
@@ -73,15 +93,29 @@ export default function Toolbar({
     );
   }
 
+  const shownCount = displayRecords.length;
+  const totalCount = totalRecords ?? shownCount;
+
   return (
     <div className="toolbar">
-      <input
-        className="toolbar__input"
-        placeholder="Search..."
-        value={searchLocal}
-        onChange={handleSearchChange}
-      />
-      <div className="toolbar__filters">
+
+      {/* Row 1 — Search + Filters */}
+      <div className="toolbar__row toolbar__row--main">
+        <div className="toolbar__search-wrap">
+          <input
+            className="toolbar__input"
+            placeholder="Search records…"
+            value={searchLocal}
+            onChange={handleSearchChange}
+            title="Smart search: type freely, or prefix with ctrl: subject: from: by: status: unit: to target a specific field. Multiple terms are AND-coupled."
+          />
+          <span className="toolbar__count">
+            {shownCount === totalCount
+              ? `${totalCount} record${totalCount !== 1 ? 's' : ''}`
+              : `${shownCount} of ${totalCount}`}
+          </span>
+        </div>
+
         {apiError && <div className="form-panel__error">{apiError}</div>}
 
         <select
@@ -104,58 +138,81 @@ export default function Toolbar({
           <option value="FILED">Filed</option>
         </select>
 
-        {isFiltered && (
-          <button type="button" className="toolbar__clear-filters" onClick={clearFilters}>
-            Clear Filters
-          </button>
-        )}
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className={filterStatus !== 'ALL' ? 'filter-active' : ''}
+        >
+          <option value="ALL">All Statuses</option>
+          <option value="Pending">Pending</option>
+          <option value="Overdue">Overdue</option>
+          <option value="Completed">Completed</option>
+        </select>
 
         <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)}>
           <option value="">All Months</option>
-          {Array.from({ length: 12 }).map((_, i) => {
+          {MONTH_NAMES.map((name, i) => {
             const m = String(i + 1).padStart(2, '0');
-            return <option key={m} value={m}>{m}</option>;
+            return <option key={m} value={m}>{name}</option>;
           })}
         </select>
 
         <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)}>
           <option value="">All Years</option>
-          {Array.from({ length: 6 }).map((_, i) => {
-            const y = String(currentYear - i);
-            return <option key={y} value={y}>{y}</option>;
-          })}
+          {availableYears.map((y) => (
+            <option key={y} value={y}>{y}</option>
+          ))}
         </select>
 
         <div className="toolbar__date">
-          <span>Date From</span>
-          <input
-            type="text"
-            placeholder="MM/DD/YYYY"
-            value={toDisplayDate(dateFrom)}
-            onChange={(e) => setDateFrom(toIsoDate(e.target.value))}
-          />
-          <span>To</span>
-          <input
-            type="text"
-            placeholder="MM/DD/YYYY"
-            value={toDisplayDate(dateTo)}
-            onChange={(e) => setDateTo(toIsoDate(e.target.value))}
-          />
+          <label className="toolbar__date-label">
+            From
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className={dateFrom ? 'filter-active' : ''}
+            />
+          </label>
+          <label className="toolbar__date-label">
+            To
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className={dateTo ? 'filter-active' : ''}
+            />
+          </label>
         </div>
 
-        <button type="button" onClick={() => handleExportPdf(displayRecords, activeSection, filterMonthForPdf, filterYearForPdf)}>
-          Export (PDF)
-        </button>
-        <button type="button" onClick={handleExportCsv}>
-          Export (CSV)
-        </button>
-        <button type="button" onClick={handleExportExcel}>
-          Export (Excel)
-        </button>
-        <button type="button" onClick={() => refreshRecords(true)} disabled={isLoadingRecords}>
-          {isLoadingRecords ? 'Refreshing...' : 'Refresh'}
-        </button>
+        {isFiltered && (
+          <button type="button" className="toolbar__clear-filters" onClick={clearFilters}>
+            Clear Filters
+          </button>
+        )}
       </div>
+
+      {/* Row 2 — Exports + Refresh */}
+      <div className="toolbar__row toolbar__row--actions">
+        <button type="button" className="toolbar__new-record" onClick={onNewRecord}>
+          + New Record
+        </button>
+        <button type="button" className="toolbar__refresh" onClick={() => refreshRecords(true)} disabled={isLoadingRecords}>
+          {isLoadingRecords ? 'Refreshing…' : 'Refresh'}
+        </button>
+        <div className="toolbar__exports">
+          <button type="button" onClick={() => handleExportPdf(displayRecords, activeSection, filterMonthForPdf, filterYearForPdf)}>
+            Export PDF
+          </button>
+          <button type="button" onClick={handleExportCsv}>
+            Export CSV
+          </button>
+          <button type="button" onClick={handleExportExcel}>
+            Export Excel
+          </button>
+        </div>
+      </div>
+
     </div>
   );
 }

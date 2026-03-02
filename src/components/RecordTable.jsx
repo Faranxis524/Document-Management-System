@@ -12,6 +12,16 @@ function StatusBadge({ status }) {
   return <span className={`status-badge ${cls}`}>{status || 'Pending'}</span>;
 }
 
+function ActionBadge({ action }) {
+  const map = {
+    DRAFTED:      { cls: 'action-badge--drafted',      label: 'Drafted' },
+    DISSEMINATED: { cls: 'action-badge--disseminated', label: 'Disseminated' },
+    FILED:        { cls: 'action-badge--filed',        label: 'Filed' },
+  };
+  const { cls = '', label = action } = map[action] || {};
+  return <span className={`action-badge ${cls}`}>{label}</span>;
+}
+
 function SkeletonRow() {
   return (
     <div className="table__row table__row--skeleton">
@@ -67,8 +77,10 @@ export default function RecordTable({ displayRecords, activeSection, setIsTableE
         )}
 
         {!isLoadingRecords && displayRecords.length === 0 && (
-          <div className="table__row table__row--empty">
-            <div className="table__cell">No records yet.</div>
+          <div className="table__empty">
+            <div className="table__empty-icon">📂</div>
+            <div className="table__empty-title">No records found</div>
+            <div className="table__empty-sub">Try adjusting your filters or add a new record using the form.</div>
           </div>
         )}
       </div>
@@ -113,7 +125,7 @@ export function RecordRow({ row, authToken, onEdit, expanded = false }) {
       <div className="table__cell">{row.fromValue}</div>
       <div className="table__cell">{toDisplayDate(row.targetDate) || row.targetDate}</div>
       <div className="table__cell">{row.receivedBy}</div>
-      <div className="table__cell">{row.actionTaken}</div>
+      <div className="table__cell"><ActionBadge action={row.actionTaken} /></div>
       <div className="table__cell">{row.remarksText || row.remarks || ''}</div>
       <div className="table__cell">{row.concernedUnits}</div>
       <div className="table__cell">{toDisplayDate(row.dateSent)}</div>

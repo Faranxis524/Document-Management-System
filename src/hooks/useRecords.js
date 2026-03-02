@@ -186,7 +186,7 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
   };
 
   // ── Create record ──────────────────────────────────────────────────────────
-  const handleSaveRecord = async () => {
+  const handleSaveRecord = async (onSuccess) => {
     const errors = {};
     if (!recordForm.dateReceived) errors.dateReceived = 'Date received is required.';
     if (!recordForm.subjectText && !recordForm.subjectFile) errors.subjectText = 'Provide a subject or upload a document.';
@@ -257,6 +257,7 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
       }));
       setFormErrors({});
       setFormErrorMessage('');
+      onSuccess?.();
     } catch (error) {
       showToast('error', 'Save Failed', error.message);
     } finally {
