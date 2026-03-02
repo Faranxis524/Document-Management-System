@@ -2,7 +2,7 @@
 # This PowerShell script configures DMS to start automatically when Windows starts
 
 $dmsPath = $PSScriptRoot
-$batchFile = Join-Path $dmsPath "start-dms.bat"
+$batchFile = Join-Path $dmsPath "start-dms-production.bat"
 
 Write-Host "=== DMS Auto-Start Setup ===" -ForegroundColor Green
 Write-Host ""
@@ -12,8 +12,8 @@ Write-Host ""
 
 # Check if batch file exists
 if (-not (Test-Path $batchFile)) {
-    Write-Host "ERROR: start-dms.bat not found!" -ForegroundColor Red
-    Write-Host "Please make sure start-dms.bat is in the DMS folder."
+    Write-Host "ERROR: start-dms-production.bat not found!" -ForegroundColor Red
+    Write-Host "Please make sure start-dms-production.bat is in the DMS folder."
     pause
     exit
 }
