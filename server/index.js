@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
@@ -13,6 +14,32 @@ require('dotenv').config();
 
 const { db, initDb, isSqlite } = require('./lib/db');
 const { seedUsers } = require('./lib/seedUsers');
+
+// Detect the first non-loopback IPv4 address (e.g. 192.168.x.x or 10.x.x.x)
+function getLocalNetworkIp() {
+  const ifaces = os.networkInterfaces();
+  for (const name of Object.keys(ifaces)) {
+    for (const iface of ifaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return null;
+}
+
+// Build the complete list of allowed CORS origins, merging the .env list with
+// the auto-detected network IP so remote devices can always connect.
+function buildAllowedOrigins() {
+  const origins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()).filter(Boolean) || ['http://localhost:3000', 'http://localhost:5000'];
+  const ip = getLocalNetworkIp();
+  if (ip) {
+    [`http://${ip}:3000`, `http://${ip}:5000`].forEach(o => {
+      if (!origins.includes(o)) origins.push(o);
+    });
+  }
+  return origins;
+}
 
 const app = express();
 
@@ -39,7 +66,7 @@ app.use(helmet({
 
 // CORS Configuration
 const corsOptions = {
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
+  origin: buildAllowedOrigins(),
   credentials: true,
   optionsSuccessStatus: 200
 };
@@ -1048,20 +1075,21 @@ async function startServer() {
   }
   
   server = app.listen(port, host, () => {
+    const networkIp = getLocalNetworkIp();
     console.log(`API listening on ${host}:${port} using ${isSqlite ? 'SQLite' : 'Postgres'}`);
     console.log(`Local:   http://localhost:${port}`);
-    console.log(`Network: http://10.42.11.207:${port}`);
+    if (networkIp) {
+      console.log(`Network: http://${networkIp}:${port}`);
+    }
   });
   
+  // Collect all allowed origins, adding the auto-detected network IP dynamically
+  const socketAllowedOrigins = buildAllowedOrigins();
+
   // Initialize Socket.IO
   io = new Server(server, {
     cors: {
-      origin: process.env.ALLOWED_ORIGINS?.split(',') || [
-        'http://localhost:3000',
-        'http://localhost:5000',
-        'http://192.168.254.193:5000',
-        'http://10.42.11.207:5000'  // ZeroTier IP
-      ],
+      origin: socketAllowedOrigins,
       credentials: true
     }
   });
