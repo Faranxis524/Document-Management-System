@@ -1,10 +1,12 @@
 import { useState, useCallback } from 'react';
 
+let toastCounter = 0;
+
 export function useToast() {
   const [toasts, setToasts] = useState([]);
 
   const showToast = useCallback((type, title, message) => {
-    const id = Date.now();
+    const id = ++toastCounter;
     setToasts((prev) => [...prev, { id, type, title, message }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));

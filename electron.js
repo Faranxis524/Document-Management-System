@@ -19,10 +19,31 @@ function createWindow() {
   // Start the backend server inside Electron's own Node.js (no system Node.js needed)
   startBackendServer();
 
-  // Wait for server to be ready, then load the app
-  setTimeout(() => {
-    mainWindow.loadURL('http://localhost:5000');
-  }, 4000);
+  // Poll until the server responds, then load the app (max 30 seconds)
+  const serverUrl = 'http://localhost:5000';
+  const pollInterval = 500;
+  const maxAttempts = 60;
+  let attempts = 0;
+
+  function pollServer() {
+    attempts++;
+    const http = require('http');
+    const req = http.get(serverUrl, (res) => {
+      res.resume();
+      mainWindow.loadURL(serverUrl);
+    });
+    req.on('error', () => {
+      if (attempts < maxAttempts) {
+        setTimeout(pollServer, pollInterval);
+      } else {
+        console.error('[DMS] Server did not become ready in time');
+        mainWindow.loadURL(serverUrl);
+      }
+    });
+    req.end();
+  }
+
+  setTimeout(pollServer, pollInterval);
 
   mainWindow.on('closed', () => {
     mainWindow = null;

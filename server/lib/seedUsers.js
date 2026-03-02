@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const { db } = require('./db');
 
+// DEVELOPMENT-ONLY DEFAULTS — change all passwords immediately after first login.
 const DEFAULT_USERS = [
   // Add admin user for testing
   { username: 'admin', password: 'admin123', role: 'MC', section: null },
@@ -17,6 +18,7 @@ const DEFAULT_USERS = [
 ];
 
 async function seedUsers() {
+  console.warn('[SECURITY] Default seed passwords are in use. Change all passwords immediately after first login!');
   console.log('Seeding users...');
   
   for (const user of DEFAULT_USERS) {
