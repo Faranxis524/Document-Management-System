@@ -25,3 +25,18 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Electron build outputs (large binary files - exceeds GitHub 100MB limit)
+/release/
+/release2/
+/release3/
+/release3b/
+/release3c/
+/release4/
+*.zip
+*.exe
+*.asar
+
+# Environment files
+.env
+.env.production

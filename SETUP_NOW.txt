@@ -1,0 +1,132 @@
+═══════════════════════════════════════════════════════════════
+  ZEROTIER SETUP - FOLLOW THESE STEPS NOW
+═══════════════════════════════════════════════════════════════
+
+I've opened two browser tabs for you:
+1. ZeroTier website (to sign up)
+2. ZeroTier download page (to download installer)
+
+───────────────────────────────────────────────────────────────
+STEP 1: CREATE YOUR ACCOUNT (5 minutes)
+───────────────────────────────────────────────────────────────
+
+In the ZeroTier website tab:
+
+1. Click "Sign Up" (top right corner)
+
+2. Enter your details:
+   Email: _________________________________
+   Password: _______________________________
+
+3. Click "Sign Up"
+
+4. Check your email and click the verification link
+
+5. You'll be taken to: https://my.zerotier.com
+
+───────────────────────────────────────────────────────────────
+STEP 2: CREATE YOUR NETWORK
+───────────────────────────────────────────────────────────────
+
+On https://my.zerotier.com page:
+
+1. Click "Create A Network" button
+
+2. A new network appears! Click on the Network ID
+   (16 characters like: abc123def456ghij)
+
+3. Change the network name:
+   Name: My DMS Network
+
+4. IMPORTANT: Write down your Network ID here:
+   
+   Network ID: _________________________________
+              (You'll need this - save it!)
+
+5. Make sure Access Control shows: "PRIVATE" ✓
+
+───────────────────────────────────────────────────────────────
+STEP 3: DOWNLOAD & INSTALL ZEROTIER (3 minutes)
+───────────────────────────────────────────────────────────────
+
+In the download page tab:
+
+1. Click "Download for Windows"
+   File downloads: ZeroTier One.msi
+
+2. Once downloaded, double-click the installer
+
+3. Follow the installation:
+   - Click "Next"
+   - Accept license
+   - Click "Install"
+   - When Windows asks "Allow?" → Click YES
+   - Click "Finish"
+
+4. Look for ZeroTier icon in system tray (bottom-right)
+   (small network icon near the clock)
+
+───────────────────────────────────────────────────────────────
+STEP 4: JOIN YOUR NETWORK
+───────────────────────────────────────────────────────────────
+
+After ZeroTier is installed:
+
+1. Find ZeroTier icon in system tray (bottom-right)
+
+2. Right-click the ZeroTier icon
+
+3. Click "Join Network..."
+
+4. Enter your Network ID (from Step 2)
+   Network ID: _________________________________
+
+5. Click "Join"
+
+6. You'll see notification: "Joined Network"
+
+───────────────────────────────────────────────────────────────
+STEP 5: APPROVE THIS COMPUTER
+───────────────────────────────────────────────────────────────
+
+Go back to browser (https://my.zerotier.com):
+
+1. Click on your network
+
+2. Scroll down to "Members" section
+
+3. You should see a new device (this computer!)
+
+4. Check the box under "Auth?" to approve ✓
+
+5. IMPORTANT: Copy the IP address shown:
+   
+   ZeroTier IP: _________________________________
+               (looks like: 10.147.18.123)
+
+6. This computer is now: ONLINE ✓
+
+───────────────────────────────────────────────────────────────
+✅ DONE - PART 1 COMPLETE!
+───────────────────────────────────────────────────────────────
+
+Your DMS computer is now on ZeroTier network!
+
+Save this information:
+- Network ID: _________________________________
+- DMS IP:     _________________________________
+
+───────────────────────────────────────────────────────────────
+NEXT: Set Up Your Home Device
+───────────────────────────────────────────────────────────────
+
+When you get home or on your phone:
+
+1. Install ZeroTier (same download page)
+2. Join the SAME Network ID
+3. Approve the device on my.zerotier.com
+4. Access DMS: http://[DMS-IP]:5000
+
+═══════════════════════════════════════════════════════════════
+
+Tell me when you've completed each step and I'll help you test it!

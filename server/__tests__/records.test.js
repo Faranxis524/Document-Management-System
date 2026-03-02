@@ -56,13 +56,14 @@ describe('Records API', () => {
   describe('POST /records', () => {
     test('should create a new record with valid data', async () => {
       const newRecord = {
-        section: 'HR',
+        section: 'INVES',
         dateReceived: '2026-02-18',
-        from: 'John Doe',
-        nature: 'Employee Request',
-        classification: 'Internal',
-        actionTaken: 'Pending',
-        remarks: 'Test record'
+        subjectText: 'Employee Request',
+        fromValue: 'IND',
+        targetDate: '2026-03-01',
+        receivedBy: 'NUP TALA',
+        actionTaken: 'DRAFTED',
+        concernedUnits: 'IND'
       };
 
       const response = await request(app)
@@ -70,10 +71,11 @@ describe('Records API', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send(newRecord);
 
-      expect(response.status).toBe(201);
+      expect(response.status).toBe(200);
       expect(response.body.id).toBeDefined();
-      expect(response.body.controlNumber).toBeDefined();
+      expect(response.body.mcCtrlNo).toBeDefined();
       expect(response.body.section).toBe(newRecord.section);
+      expect(response.body.status).toBe('Pending');
       
       testRecordId = response.body.id;
     });
@@ -106,16 +108,18 @@ describe('Records API', () => {
         .post('/records')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          section: 'IT',
+          section: 'INVES',
           dateReceived: '2026-02-18',
-          from: 'Test User',
-          nature: 'Test Nature',
-          classification: 'Public',
-          actionTaken: 'Filed'
+          subjectText: 'Auto ctrl test',
+          fromValue: 'IND',
+          targetDate: '2026-03-01',
+          receivedBy: 'NUP TALA',
+          actionTaken: 'DRAFTED',
+          concernedUnits: 'IND'
         });
 
-      expect(response.status).toBe(201);
-      expect(response.body.controlNumber).toMatch(/^IT-\d{4}-\d+$/);
+      expect(response.status).toBe(200);
+      expect(response.body.mcCtrlNo).toBeDefined();
     });
   });
 

@@ -1,0 +1,145 @@
+╔══════════════════════════════════════════════════════════════╗
+║                                                              ║
+║          ZEROTIER SETUP - QUICK START CARD                   ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────┐
+│ PART 1: ON THIS COMPUTER (DMS Office Computer)              │
+└──────────────────────────────────────────────────────────────┘
+
+☐ STEP 1: Create Account
+  → Go to: https://www.zerotier.com
+  → Click "Sign Up"
+  → Enter email and password
+  → Verify email
+
+☐ STEP 2: Create Network  
+  → Login to: https://my.zerotier.com
+  → Click "Create A Network"
+  → Click on the Network ID to open settings
+  → Change name to: "My DMS Network"
+  → Copy Network ID: _______________________________
+                     (16 characters - SAVE THIS!)
+
+☐ STEP 3: Install ZeroTier
+  → Download: https://www.zerotier.com/download/
+  → Click "Download for Windows"
+  → Install ZeroTier One.msi
+  → Look for icon in system tray (bottom-right)
+
+☐ STEP 4: Join Network
+  → Right-click ZeroTier icon
+  → Click "Join Network..."
+  → Enter Network ID: _______________________________
+  → Click "Join"
+
+☐ STEP 5: Approve This Computer
+  → Go to: https://my.zerotier.com
+  → Click on your network
+  → Scroll to "Members"
+  → Check the box under "Auth?" ✓
+  → Copy ZeroTier IP: _______________________________
+                      (looks like: 10.147.18.xxx)
+
+┌──────────────────────────────────────────────────────────────┐
+│ PART 2: ON YOUR HOME COMPUTER / PHONE                       │
+└──────────────────────────────────────────────────────────────┘
+
+☐ STEP 6: Install ZeroTier on Home Device
+
+  WINDOWS/MAC:
+  → Download from: https://www.zerotier.com/download/
+  → Install
+
+  PHONE (Android/iPhone):
+  → Open App Store / Play Store
+  → Search: "ZeroTier One"
+  → Install
+
+☐ STEP 7: Join Same Network
+  → Right-click ZeroTier icon (or open app on phone)
+  → Click "Join Network..."
+  → Enter same Network ID: _______________________________
+  → Click "Join"
+
+☐ STEP 8: Approve Home Device
+  → Go to: https://my.zerotier.com
+  → Click on your network
+  → See new device in "Members"
+  → Check the box under "Auth?" ✓
+  → Device now shows "ONLINE"
+
+┌──────────────────────────────────────────────────────────────┐
+│ STEP 9: ACCESS YOUR DMS FROM ANYWHERE!                      │
+└──────────────────────────────────────────────────────────────┘
+
+☐ On DMS Computer (Office):
+  → Start DMS: Double-click START-DMS.bat
+
+☐ On Your Home Computer/Phone:
+  → Make sure ZeroTier is connected
+  → Open browser
+  → Go to: http://_______________________:5000
+                 (DMS ZeroTier IP from Step 5)
+
+☐ 🎉 DMS LOADS! Login and use normally!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+                    📝 SAVE THIS INFO
+
+Network ID: _____________________________________________
+
+DMS IP:     _____________________________________________
+
+URL:        http://____________________________:5000
+
+Login:      https://my.zerotier.com
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔸 DAILY USE:
+
+  1. Make sure ZeroTier is running (auto-starts)
+  2. Start DMS on office computer
+  3. Open browser to: http://[DMS-IP]:5000
+  4. Done!
+
+🔸 BOOKMARK THIS URL ON ALL YOUR DEVICES!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️  TROUBLESHOOTING:
+
+Problem: Can't connect
+Fix: Check ZeroTier icon shows "Connected"
+
+Problem: DMS not loading  
+Fix: Make sure DMS is running on office computer
+
+Problem: No device in Members
+Fix: Wait 30 seconds, refresh browser
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ CHECKLIST WHEN DONE:
+
+  ☐ Account created
+  ☐ Network created
+  ☐ Network ID saved
+  ☐ ZeroTier installed on office computer
+  ☐ Office computer approved
+  ☐ DMS IP address saved
+  ☐ ZeroTier installed on home device
+  ☐ Home device approved
+  ☐ Successfully accessed DMS from home!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📖 FULL GUIDE: See ZEROTIER_SETUP_GUIDE.md for complete
+               details and troubleshooting
+
+🔒 SECURE: All connections are encrypted end-to-end!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

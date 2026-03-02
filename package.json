@@ -1,5 +1,6 @@
 {
   "name": "dms",
+  "productName": "Document Management System",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
@@ -12,13 +13,18 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-scripts": "5.0.1",
+    "socket.io-client": "^4.8.3",
     "web-vitals": "^2.1.4"
   },
+  "main": "electron.js",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "electron": "electron .",
+    "electron-dev": "npm run build && electron .",
+    "dist": "npm run build && electron-builder"
   },
   "eslintConfig": {
     "extends": [
@@ -37,5 +43,49 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "build": {
+    "extends": null,
+    "appId": "com.dms.app",
+    "productName": "Document Management System",
+    "toolsets": {
+      "winCodeSign": "1.0.0"
+    },
+    "directories": {
+      "output": "release",
+      "buildResources": "public"
+    },
+    "win": {
+      "target": ["dir"],
+      "requestedExecutionLevel": "asInvoker",
+      "signAndEditExecutable": false,
+      "signExts": [".never-sign"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Document Management System"
+    },
+    "asar": true,
+    "asarUnpack": [
+      "server/**/*",
+      "build/**/*"
+    ],
+    "files": [
+      "build/**/*",
+      "server/**/*",
+      "electron.js",
+      "package.json",
+      "!node_modules",
+      "!node_modules/**/*",
+      "!src",
+      "!public"
+    ]
+  },
+  "devDependencies": {
+    "electron": "^40.6.0",
+    "electron-builder": "^26.8.1"
   }
 }

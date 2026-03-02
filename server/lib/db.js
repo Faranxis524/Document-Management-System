@@ -20,6 +20,9 @@ async function initDb() {
   if (isSqlite) {
     ensureDir();
     sqliteDb = new sqlite3.Database(sqlitePath);
+    // Enable WAL mode for better concurrent-read performance and crash safety
+    await runSqlite('PRAGMA journal_mode=WAL;');
+    await runSqlite('PRAGMA synchronous=NORMAL;');
     await runSqlite(`
       CREATE TABLE IF NOT EXISTS records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,12 +41,26 @@ async function initDb() {
         remarks TEXT,
         concernedUnits TEXT,
         dateSent TEXT,
+        status TEXT DEFAULT 'Pending',
         createdBy TEXT,
         updatedBy TEXT,
         createdAt TEXT,
-        updatedAt TEXT
+        updatedAt TEXT,
+        version INTEGER DEFAULT 1
       );
     `);
+    
+    // Add new columns if they don't exist (for existing databases)
+    try {
+      await runSqlite(`ALTER TABLE records ADD COLUMN version INTEGER DEFAULT 1;`);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+    try {
+      await runSqlite(`ALTER TABLE records ADD COLUMN status TEXT DEFAULT 'Pending';`);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
     await runSqlite(`
       CREATE TABLE IF NOT EXISTS counters (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,18 +78,47 @@ async function initDb() {
         role TEXT NOT NULL,
         section TEXT,
         isActive INTEGER DEFAULT 1,
+        permissions TEXT DEFAULT '{}',
         createdAt TEXT,
         updatedAt TEXT
+      );
+    `);
+    
+    // Add permissions column if it doesn't exist
+    try {
+      await runSqlite(`ALTER TABLE users ADD COLUMN permissions TEXT DEFAULT '{}';`);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+    
+    // Create audit_logs table
+    await runSqlite(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        recordId INTEGER,
+        action TEXT NOT NULL,
+        fieldName TEXT,
+        oldValue TEXT,
+        newValue TEXT,
+        performedBy TEXT NOT NULL,
+        performedAt TEXT NOT NULL,
+        ipAddress TEXT,
+        userAgent TEXT
       );
     `);
     
     // Create indexes for better query performance
     await runSqlite(`CREATE INDEX IF NOT EXISTS idx_records_section ON records(section);`);
     await runSqlite(`CREATE INDEX IF NOT EXISTS idx_records_dateReceived ON records(dateReceived);`);
+    await runSqlite(`CREATE INDEX IF NOT EXISTS idx_records_targetDate ON records(targetDate);`);
+    await runSqlite(`CREATE INDEX IF NOT EXISTS idx_records_status ON records(status);`);
+    await runSqlite(`CREATE INDEX IF NOT EXISTS idx_records_mcCtrlNo ON records(mcCtrlNo);`);
     await runSqlite(`CREATE INDEX IF NOT EXISTS idx_records_createdBy ON records(createdBy);`);
     await runSqlite(`CREATE INDEX IF NOT EXISTS idx_records_actionTaken ON records(actionTaken);`);
     await runSqlite(`CREATE INDEX IF NOT EXISTS idx_counters_scope_section ON counters(scope, section);`);
     await runSqlite(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);`);
+    await runSqlite(`CREATE INDEX IF NOT EXISTS idx_audit_logs_recordId ON audit_logs(recordId);`);
+    await runSqlite(`CREATE INDEX IF NOT EXISTS idx_audit_logs_performedBy ON audit_logs(performedBy);`);
   } else {
     pgPool = new Pool({
       host: process.env.PG_HOST,
@@ -99,12 +145,26 @@ async function initDb() {
         remarks TEXT,
         concernedUnits TEXT,
         dateSent TEXT,
+        status TEXT DEFAULT 'Pending',
         createdBy TEXT,
         updatedBy TEXT,
         createdAt TEXT,
-        updatedAt TEXT
+        updatedAt TEXT,
+        version INTEGER DEFAULT 1
       );
     `);
+    
+    // Add new columns if they don't exist (for existing databases)
+    try {
+      await pgPool.query(`ALTER TABLE records ADD COLUMN version INTEGER DEFAULT 1;`);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+    try {
+      await pgPool.query(`ALTER TABLE records ADD COLUMN status TEXT DEFAULT 'Pending';`);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
     await pgPool.query(`
       CREATE TABLE IF NOT EXISTS counters (
         id SERIAL PRIMARY KEY,
@@ -122,18 +182,47 @@ async function initDb() {
         role TEXT NOT NULL,
         section TEXT,
         isActive BOOLEAN DEFAULT TRUE,
+        permissions TEXT DEFAULT '{}',
         createdAt TEXT,
         updatedAt TEXT
+      );
+    `);
+    
+    // Add permissions column if it doesn't exist
+    try {
+      await pgPool.query(`ALTER TABLE users ADD COLUMN permissions TEXT DEFAULT '{}';`);
+    } catch (err) {
+      // Column already exists, ignore error
+    }
+    
+    // Create audit_logs table
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id SERIAL PRIMARY KEY,
+        recordId INTEGER,
+        action TEXT NOT NULL,
+        fieldName TEXT,
+        oldValue TEXT,
+        newValue TEXT,
+        performedBy TEXT NOT NULL,
+        performedAt TEXT NOT NULL,
+        ipAddress TEXT,
+        userAgent TEXT
       );
     `);
     
     // Create indexes for better query performance
     await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_records_section ON records(section);`);
     await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_records_dateReceived ON records(dateReceived);`);
+    await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_records_targetDate ON records(targetDate);`);
+    await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_records_status ON records(status);`);
+    await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_records_mcCtrlNo ON records(mcCtrlNo);`);
     await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_records_createdBy ON records(createdBy);`);
     await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_records_actionTaken ON records(actionTaken);`);
     await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_counters_scope_section ON counters(scope, section);`);
     await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);`);
+    await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_recordId ON audit_logs(recordId);`);
+    await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_performedBy ON audit_logs(performedBy);`);
   }
 }
 
@@ -309,6 +398,7 @@ async function createRecord(payload) {
     remarks: payload.remarks,
     concernedUnits: payload.concernedUnits,
     dateSent: payload.dateSent,
+    status: payload.status ?? calculateStatus(payload),
     createdBy: payload.createdBy || payload.username,
     updatedBy: payload.updatedBy || payload.username,
     createdAt: now,
@@ -320,8 +410,8 @@ async function createRecord(payload) {
       `INSERT INTO records (
         mcCtrlNo, sectionCtrlNo, section, dateReceived, subjectText, subjectFileUrl,
         fromValue, fromType, targetDate, targetDateMode, receivedBy, actionTaken,
-        remarks, concernedUnits, dateSent, createdBy, updatedBy, createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        remarks, concernedUnits, dateSent, status, createdBy, updatedBy, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         record.mcCtrlNo,
         record.sectionCtrlNo,
@@ -338,6 +428,7 @@ async function createRecord(payload) {
         record.remarks,
         record.concernedUnits,
         record.dateSent,
+        record.status,
         record.createdBy,
         record.updatedBy,
         record.createdAt,
@@ -351,8 +442,8 @@ async function createRecord(payload) {
     `INSERT INTO records (
       mcCtrlNo, sectionCtrlNo, section, dateReceived, subjectText, subjectFileUrl,
       fromValue, fromType, targetDate, targetDateMode, receivedBy, actionTaken,
-      remarks, concernedUnits, dateSent, createdBy, updatedBy, createdAt, updatedAt
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+      remarks, concernedUnits, dateSent, status, createdBy, updatedBy, createdAt, updatedAt
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
     RETURNING *;`,
     [
       record.mcCtrlNo,
@@ -370,6 +461,7 @@ async function createRecord(payload) {
       record.remarks,
       record.concernedUnits,
       record.dateSent,
+      record.status,
       record.createdBy,
       record.updatedBy,
       record.createdAt,
@@ -382,14 +474,22 @@ async function createRecord(payload) {
 async function listRecords(filters = {}) {
   const { section } = filters;
   if (isSqlite) {
-    if (section) return await allSqlite('SELECT * FROM records WHERE section = ? ORDER BY dateReceived ASC;', [section]);
-    return await allSqlite('SELECT * FROM records ORDER BY dateReceived ASC;');
+    const baseWhere = "mcCtrlNo IS NOT NULL AND TRIM(mcCtrlNo) <> '' AND sectionCtrlNo IS NOT NULL AND TRIM(sectionCtrlNo) <> '' AND section IS NOT NULL AND TRIM(section) <> ''";
+    if (section) {
+      return await allSqlite(`SELECT * FROM records WHERE ${baseWhere} AND section = ? ORDER BY dateReceived ASC;`, [section]);
+    }
+    return await allSqlite(`SELECT * FROM records WHERE ${baseWhere} ORDER BY dateReceived ASC;`);
   }
   if (section) {
-    const result = await pgPool.query('SELECT * FROM records WHERE section = $1 ORDER BY dateReceived ASC;', [section]);
+    const result = await pgPool.query(
+      "SELECT * FROM records WHERE mcCtrlNo IS NOT NULL AND BTRIM(mcCtrlNo) <> '' AND sectionCtrlNo IS NOT NULL AND BTRIM(sectionCtrlNo) <> '' AND section IS NOT NULL AND BTRIM(section) <> '' AND section = $1 ORDER BY dateReceived ASC;",
+      [section]
+    );
     return result.rows;
   }
-  const result = await pgPool.query('SELECT * FROM records ORDER BY dateReceived ASC;');
+  const result = await pgPool.query(
+    "SELECT * FROM records WHERE mcCtrlNo IS NOT NULL AND BTRIM(mcCtrlNo) <> '' AND sectionCtrlNo IS NOT NULL AND BTRIM(sectionCtrlNo) <> '' AND section IS NOT NULL AND BTRIM(section) <> '' ORDER BY dateReceived ASC;"
+  );
   return result.rows;
 }
 
@@ -403,7 +503,22 @@ async function updateRecord(id, payload) {
   const current = await getRecord(id);
   if (!current) return null;
 
+  // Optimistic Locking: Check version if provided
+  const clientVersion = payload.version;
+  const currentVersion = current.version || 1;
+  
+  if (clientVersion !== undefined && clientVersion !== currentVersion) {
+    // Version conflict detected
+    const error = new Error('Record was modified by another user. Please refresh and try again.');
+    error.code = 'VERSION_CONFLICT';
+    error.currentVersion = currentVersion;
+    error.clientVersion = clientVersion;
+    throw error;
+  }
+
   const now = new Date().toISOString();
+  const newVersion = currentVersion + 1;
+  
   const fields = {
     mcCtrlNo: payload.mcCtrlNo ?? current.mcCtrlNo,
     sectionCtrlNo: payload.sectionCtrlNo ?? current.sectionCtrlNo,
@@ -422,10 +537,12 @@ async function updateRecord(id, payload) {
     dateSent: payload.dateSent ?? current.dateSent,
     updatedBy: payload.updatedBy || payload.username || current.updatedBy,
     updatedAt: now,
+    version: newVersion,
+    status: payload.status ?? current.status,
   };
 
   if (isSqlite) {
-    await runSqlite(
+    const result = await runSqlite(
       `UPDATE records SET
         mcCtrlNo = ?,
         sectionCtrlNo = ?,
@@ -442,9 +559,11 @@ async function updateRecord(id, payload) {
         remarks = ?,
         concernedUnits = ?,
         dateSent = ?,
+        status = ?,
         updatedBy = ?,
-        updatedAt = ?
-      WHERE id = ?;`,
+        updatedAt = ?,
+        version = ?
+      WHERE id = ? AND version = ?;`,
       [
         fields.mcCtrlNo,
         fields.sectionCtrlNo,
@@ -461,11 +580,23 @@ async function updateRecord(id, payload) {
         fields.remarks,
         fields.concernedUnits,
         fields.dateSent,
+        fields.status,
         fields.updatedBy,
         fields.updatedAt,
+        newVersion,
         id,
+        currentVersion,
       ]
     );
+    
+    // Check if any rows were updated
+    if (result.changes === 0) {
+      // This means another update happened between our read and write
+      const error = new Error('Record was modified by another user. Please refresh and try again.');
+      error.code = 'VERSION_CONFLICT';
+      throw error;
+    }
+    
     return await getRecord(id);
   }
 
@@ -486,9 +617,11 @@ async function updateRecord(id, payload) {
       remarks = $13,
       concernedUnits = $14,
       dateSent = $15,
-      updatedBy = $16,
-      updatedAt = $17
-    WHERE id = $18 RETURNING *;`,
+      status = $16,
+      updatedBy = $17,
+      updatedAt = $18,
+      version = $19
+    WHERE id = $20 AND version = $21 RETURNING *;`,
     [
       fields.mcCtrlNo,
       fields.sectionCtrlNo,
@@ -505,11 +638,23 @@ async function updateRecord(id, payload) {
       fields.remarks,
       fields.concernedUnits,
       fields.dateSent,
+      fields.status,
       fields.updatedBy,
       fields.updatedAt,
+      newVersion,
       id,
+      currentVersion,
     ]
   );
+  
+  // Check if any rows were updated
+  if (update.rowCount === 0) {
+    // This means another update happened between our read and write
+    const error = new Error('Record was modified by another user. Please refresh and try again.');
+    error.code = 'VERSION_CONFLICT';
+    throw error;
+  }
+  
   return update.rows[0];
 }
 
@@ -724,15 +869,116 @@ async function getUserById(id) {
   return result.rows[0];
 }
 
-async function listUsers() {
+// Audit Log Functions
+async function createAuditLog({ recordId, action, fieldName, oldValue, newValue, performedBy, ipAddress, userAgent }) {
+  const now = new Date().toISOString();
   if (isSqlite) {
-    return await allSqlite('SELECT id, username, role, section, isActive FROM users ORDER BY username ASC;');
+    await runSqlite(
+      'INSERT INTO audit_logs (recordId, action, fieldName, oldValue, newValue, performedBy, performedAt, ipAddress, userAgent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);',
+      [recordId, action, fieldName, oldValue, newValue, performedBy, now, ipAddress, userAgent]
+    );
+  } else {
+    await pgPool.query(
+      'INSERT INTO audit_logs (recordId, action, fieldName, oldValue, newValue, performedBy, performedAt, ipAddress, userAgent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);',
+      [recordId, action, fieldName, oldValue, newValue, performedBy, now, ipAddress, userAgent]
+    );
   }
-  const result = await pgPool.query('SELECT id, username, role, section, isActive FROM users ORDER BY username ASC;');
+}
+
+async function getAuditLogsForRecord(recordId) {
+  if (isSqlite) {
+    return await allSqlite(
+      "SELECT al.*, r.section AS section, r.sectionCtrlNo AS sectionCtrlNo, r.mcCtrlNo AS mcCtrlNo " +
+        "FROM audit_logs al " +
+        "LEFT JOIN records r ON r.id = al.recordId " +
+        "WHERE al.recordId = ? AND al.action IS NOT NULL AND TRIM(al.action) <> '' " +
+        "ORDER BY al.performedAt DESC;",
+      [recordId]
+    );
+  }
+  const result = await pgPool.query(
+    "SELECT al.*, r.section AS section, r.sectionctrlno AS \"sectionCtrlNo\", r.mcctrlno AS \"mcCtrlNo\" " +
+      "FROM audit_logs al " +
+      "LEFT JOIN records r ON r.id = al.recordId " +
+      "WHERE al.recordId = $1 AND al.action IS NOT NULL AND BTRIM(al.action) <> '' " +
+      "ORDER BY al.performedAt DESC;",
+    [recordId]
+  );
   return result.rows;
 }
 
-async function updateUser(id, { password, role, section, isActive }) {
+async function getAllAuditLogs(limit = 100, offset = 0) {
+  if (isSqlite) {
+    return await allSqlite(
+      "SELECT al.*, r.section AS section, r.sectionCtrlNo AS sectionCtrlNo, r.mcCtrlNo AS mcCtrlNo " +
+        "FROM audit_logs al " +
+        "LEFT JOIN records r ON r.id = al.recordId " +
+        "WHERE al.action IS NOT NULL AND TRIM(al.action) <> '' " +
+        "ORDER BY al.performedAt DESC LIMIT ? OFFSET ?;",
+      [limit, offset]
+    );
+  }
+  const result = await pgPool.query(
+    "SELECT al.*, r.section AS section, r.sectionctrlno AS \"sectionCtrlNo\", r.mcctrlno AS \"mcCtrlNo\" " +
+      "FROM audit_logs al " +
+      "LEFT JOIN records r ON r.id = al.recordId " +
+      "WHERE al.action IS NOT NULL AND BTRIM(al.action) <> '' " +
+      "ORDER BY al.performedAt DESC LIMIT $1 OFFSET $2;",
+    [limit, offset]
+  );
+  return result.rows;
+}
+
+async function clearAuditLogs() {
+  if (isSqlite) {
+    const row = await getSqlite('SELECT COUNT(*) AS count FROM audit_logs;');
+    const deleted = Number(row?.count || 0);
+    await runSqlite('DELETE FROM audit_logs;');
+    // Reset autoincrement counter (optional, but keeps IDs starting fresh)
+    try {
+      await runSqlite("DELETE FROM sqlite_sequence WHERE name = 'audit_logs';");
+    } catch (_err) {
+      // ignore if sqlite_sequence doesn't exist
+    }
+    return { deleted };
+  }
+
+  const countResult = await pgPool.query('SELECT COUNT(*)::int AS count FROM audit_logs;');
+  const deleted = Number(countResult.rows?.[0]?.count || 0);
+  await pgPool.query('TRUNCATE TABLE audit_logs RESTART IDENTITY;');
+  return { deleted };
+}
+
+// Status Calculation Function
+function calculateStatus(record) {
+  // If Date Sent is filled → Status = Completed
+  if (record.dateSent) {
+    return 'Completed';
+  }
+  
+  // If Current Date > Target Date AND not completed → Status = Overdue
+  if (record.targetDate) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const targetDate = new Date(record.targetDate + 'T00:00:00');
+    if (today > targetDate) {
+      return 'Overdue';
+    }
+  }
+
+  // Default → Status = Pending
+  return 'Pending';
+}
+
+async function listUsers() {
+  if (isSqlite) {
+    return await allSqlite('SELECT id, username, role, section, isActive, createdAt FROM users ORDER BY role ASC, username ASC;');
+  }
+  const result = await pgPool.query('SELECT id, username, role, section, "isActive", "createdAt" FROM users ORDER BY role ASC, username ASC;');
+  return result.rows;
+}
+
+async function updateUser(id, { password, role, section, isActive, username }) {
   const now = new Date().toISOString();
   const updates = [];
   const params = [];
@@ -753,6 +999,10 @@ async function updateUser(id, { password, role, section, isActive }) {
     updates.push(isSqlite ? 'isActive = ?' : `isActive = $${params.length + 1}`);
     params.push(isActive);
   }
+  if (username !== undefined) {
+    updates.push(isSqlite ? 'username = ?' : `username = $${params.length + 1}`);
+    params.push(username);
+  }
   
   if (updates.length === 0) return await getUserById(id);
   
@@ -772,6 +1022,27 @@ async function updateUser(id, { password, role, section, isActive }) {
   return result.rows[0];
 }
 
+async function deleteUser(id) {
+  if (isSqlite) {
+    await runSqlite('DELETE FROM users WHERE id = ?;', [id]);
+    return;
+  }
+  await pgPool.query('DELETE FROM users WHERE id = $1;', [id]);
+}
+
+// ── Graceful-shutdown helper ───────────────────────────────────────────────
+function closeDb() {
+  return new Promise((resolve, reject) => {
+    if (isSqlite && sqliteDb) {
+      sqliteDb.close((err) => (err ? reject(err) : resolve()));
+    } else if (!isSqlite && pgPool) {
+      pgPool.end((err) => (err ? reject(err) : resolve()));
+    } else {
+      resolve();
+    }
+  });
+}
+
 module.exports = {
   db: {
     createRecord,
@@ -789,6 +1060,13 @@ module.exports = {
     getUserById,
     listUsers,
     updateUser,
+    deleteUser,
+    createAuditLog,
+    getAuditLogsForRecord,
+    getAllAuditLogs,
+    clearAuditLogs,
+    calculateStatus,
+    closeDb,
   },
   initDb,
   isSqlite,

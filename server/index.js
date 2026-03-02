@@ -7,12 +7,35 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const ExcelJS = require('exceljs');
 const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+const { Server } = require('socket.io');
 require('dotenv').config();
 
 const { db, initDb, isSqlite } = require('./lib/db');
 const { seedUsers } = require('./lib/seedUsers');
 
 const app = express();
+
+// Security Headers
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginOpenerPolicy: false,   // disable — requires HTTPS on non-localhost
+  strictTransportSecurity: false,   // disable HSTS — app runs on plain HTTP
+  contentSecurityPolicy: {
+    useDefaults: false,
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:'],
+      connectSrc: ["'self'", 'ws:', 'wss:'],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      frameSrc: ["'self'"],
+      // upgrade-insecure-requests intentionally omitted — app runs on HTTP
+    },
+  },
+}));
 
 // CORS Configuration
 const corsOptions = {
@@ -23,6 +46,9 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
+// Silence Chrome DevTools auto-probe (harmless browser request)
+app.get('/.well-known/appspecific/com.chrome.devtools.json', (req, res) => res.json({}));
+
 // Async Error Handler
 const asyncHandler = (fn) => (req, res, next) => {
   Promise.resolve(fn(req, res, next)).catch(next);
@@ -31,7 +57,7 @@ const asyncHandler = (fn) => (req, res, next) => {
 // Rate Limiting
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 attempts per window
+  max: Number(process.env.LOGIN_RATE_LIMIT || 10), // env-overridable; set LOGIN_RATE_LIMIT=50 in .env for testing
   message: 'Too many login attempts, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
@@ -39,9 +65,15 @@ const loginLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // 100 requests per window
+  max: Number(process.env.API_RATE_LIMIT || 500), // env-overridable; generous default for single-office use
   standardHeaders: true,
   legacyHeaders: false,
+});
+
+// Apply API rate limiter globally — skip the login endpoint (has its own stricter limiter)
+app.use((req, res, next) => {
+  if (req.path === '/auth/login') return next();
+  return apiLimiter(req, res, next);
 });
 
 const uploadDir = path.resolve(__dirname, process.env.UPLOAD_DIR || './uploads');
@@ -92,6 +124,15 @@ const upload = multer({
 
 const jwtSecret = process.env.JWT_SECRET || 'change-me';
 
+// Safety guard: refuse to start with the default insecure secret in production
+if (process.env.NODE_ENV === 'production' && jwtSecret === 'change-me') {
+  console.error('FATAL: JWT_SECRET is not set. Set a strong secret in your .env file before running in production.');
+  process.exit(1);
+}
+if (jwtSecret === 'change-me') {
+  console.warn('WARNING: JWT_SECRET is using the default insecure value. Set JWT_SECRET in your .env file.');
+}
+
 const DEFAULT_FROM = {
   INVES: 'IND',
   OPN: 'OMD',
@@ -100,7 +141,7 @@ const DEFAULT_FROM = {
 };
 
 const DEFAULT_RECEIVED_BY = {
-  INVES: ['NUP TALA'],
+  INVES: ['NUP Tala'],
   OPN: ['NUP Aldrin', 'PCPL Bueno', 'PAT Duyag'],
   INTEL: ['NUP Joyce', 'PCPL Jose'],
   ADM: ['NUP San Pedro', 'PMSG Foncardas'],
@@ -274,6 +315,26 @@ function coerceRemarksText(value) {
   return `sent through ${uniqueSorted.join('/ ')}`;
 }
 
+// ── Field-length validation ──────────────────────────────────────────────────
+const FIELD_MAX_LENGTHS = {
+  subjectText: 500,
+  fromValue: 100,
+  receivedBy: 100,
+  concernedUnits: 200,
+  actionTaken: 50,
+};
+
+function validateFieldLengths(payload) {
+  const errors = [];
+  for (const [field, max] of Object.entries(FIELD_MAX_LENGTHS)) {
+    const val = payload[field];
+    if (val && typeof val === 'string' && val.length > max) {
+      errors.push(`${field} must be at most ${max} characters`);
+    }
+  }
+  return errors;
+}
+
 function formatCtrlNo(prefix, section, dateStr, seq) {
   const date = dateStr.replace(/-/g, '').slice(2);
   const padded = String(seq).padStart(2, '0');
@@ -306,6 +367,16 @@ app.post('/auth/login', loginLimiter, validateInput({
 
 app.get('/auth/verify', authMiddleware, (req, res) => {
   res.json({ user: req.user });
+});
+
+// Refresh token — issues a new 8-hour token if the existing one is still valid
+app.post('/auth/refresh', authMiddleware, (req, res) => {
+  const freshToken = signToken({
+    username: req.user.username,
+    role: req.user.role,
+    section: req.user.section,
+  });
+  res.json({ token: freshToken });
 });
 
 app.get('/users/me', authMiddleware, (req, res) => {
@@ -354,7 +425,12 @@ app.post('/records', authMiddleware, async (req, res) => {
   if (!payload.section || !payload.dateReceived) {
     return res.status(400).json({ error: 'Section and date received are required' });
   }
-  
+
+  const lengthErrors = validateFieldLengths(payload);
+  if (lengthErrors.length > 0) {
+    return res.status(400).json({ error: lengthErrors.join('. ') });
+  }
+
   const dateErrors = validateDates(payload);
   if (dateErrors.length > 0) {
     return res.status(400).json({ error: dateErrors.join('. ') });
@@ -362,8 +438,38 @@ app.post('/records', authMiddleware, async (req, res) => {
   
   const { mcCtrlNo, sectionCtrlNo } = await getNextControlNumbers(payload.section, payload.dateReceived, false);
   const remarksText = normalizeRemarks(payload);
-  const record = await db.createRecord({ ...payload, mcCtrlNo, sectionCtrlNo, remarks: remarksText });
-  res.json({ ...record, remarksText });
+  
+  // Calculate initial status
+  const initialStatus = db.calculateStatus({ ...payload, dateSent: payload.dateSent });
+  
+  const record = await db.createRecord({ 
+    ...payload, 
+    mcCtrlNo, 
+    sectionCtrlNo, 
+    remarks: remarksText,
+    status: initialStatus
+  });
+  
+  // Create audit log for record creation
+  await db.createAuditLog({
+    recordId: record.id,
+    action: 'CREATE',
+    fieldName: null,
+    oldValue: null,
+    newValue: JSON.stringify(record),
+    performedBy: req.user.username,
+    ipAddress: req.ip,
+    userAgent: req.get('user-agent')
+  });
+  
+  const recordWithRemarks = { ...record, remarksText };
+  
+  // Emit real-time event (includes creator username so clients can ignore their own actions)
+  if (io) {
+    io.emit('record_created', { ...recordWithRemarks, _actionBy: req.user.username });
+  }
+  
+  res.json(recordWithRemarks);
 });
 
 app.get('/records', authMiddleware, async (req, res) => {
@@ -371,7 +477,7 @@ app.get('/records', authMiddleware, async (req, res) => {
   const filters = {};
   if (req.user.role === 'SECTION') {
     filters.section = req.user.section;
-  } else if (section) {
+  } else if (section && section !== 'ALL') {
     filters.section = section;
   }
   const allRecords = await db.listRecords(filters);
@@ -386,7 +492,7 @@ app.get('/records', authMiddleware, async (req, res) => {
   res.json({
     records: paginatedRecords.map((row) => ({
       ...row,
-      remarksText: coerceRemarksText(row.remarks),
+      remarksText: coerceRemarksText(row.remarks)
     })),
     pagination: {
       total: allRecords.length,
@@ -458,21 +564,94 @@ app.get('/records/:id', authMiddleware, async (req, res) => {
 });
 
 app.put('/records/:id', authMiddleware, async (req, res) => {
-  const record = await db.getRecord(req.params.id);
-  if (!record) return res.status(404).json({ error: 'Not found' });
-  if (req.user.role === 'SECTION' && record.section !== req.user.section) {
-    return res.status(403).json({ error: 'Forbidden' });
+  try {
+    const record = await db.getRecord(req.params.id);
+    if (!record) return res.status(404).json({ error: 'Not found' });
+    if (req.user.role === 'SECTION' && record.section !== req.user.section) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    
+    const payload = sanitizeInput(req.body);
+    const lengthErrors = validateFieldLengths(payload);
+    if (lengthErrors.length > 0) {
+      return res.status(400).json({ error: lengthErrors.join('. ') });
+    }
+    const dateErrors = validateDates(payload);
+    if (dateErrors.length > 0) {
+      return res.status(400).json({ error: dateErrors.join('. ') });
+    }
+    
+    const remarksText = normalizeRemarks(payload);
+    
+    // Calculate new status based on updates
+    const newStatus = db.calculateStatus({ 
+      ...record, 
+      ...payload,
+    });
+    
+    // Track field changes for audit log
+    const fieldsToTrack = [
+      'section', 'dateReceived', 'subjectText', 'fromValue', 'targetDate', 
+      'receivedBy', 'actionTaken', 'remarks', 'concernedUnits', 'dateSent', 'status'
+    ];
+    
+    const changes = [];
+    fieldsToTrack.forEach(field => {
+      let oldValue = record[field];
+      let newValue = field === 'remarks' ? remarksText : 
+                     field === 'status' ? newStatus : 
+                     payload[field];
+      
+      if (newValue !== undefined && oldValue !== newValue) {
+        changes.push({
+          fieldName: field,
+          oldValue: String(oldValue || ''),
+          newValue: String(newValue || '')
+        });
+      }
+    });
+    
+    const updated = await db.updateRecord(req.params.id, { 
+      ...payload, 
+      remarks: remarksText, 
+      status: newStatus 
+    });
+    
+    // Create audit logs for each changed field
+    for (const change of changes) {
+      await db.createAuditLog({
+        recordId: record.id,
+        action: 'UPDATE',
+        fieldName: change.fieldName,
+        oldValue: change.oldValue,
+        newValue: change.newValue,
+        performedBy: req.user.username,
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent')
+      });
+    }
+    
+    const updatedWithRemarks = { ...updated, remarksText };
+    
+    // Emit real-time event (includes updater username so clients can ignore their own actions)
+    if (io) {
+      io.emit('record_updated', { ...updatedWithRemarks, _actionBy: req.user.username });
+    }
+    
+    res.json(updatedWithRemarks);
+  } catch (error) {
+    // Handle version conflict specifically
+    if (error.code === 'VERSION_CONFLICT') {
+      return res.status(409).json({ 
+        error: error.message,
+        code: 'VERSION_CONFLICT',
+        currentVersion: error.currentVersion,
+        clientVersion: error.clientVersion
+      });
+    }
+    // Re-throw other errors to be caught by global error handler
+    throw error;
   }
-  
-  const payload = sanitizeInput(req.body);
-  const dateErrors = validateDates(payload);
-  if (dateErrors.length > 0) {
-    return res.status(400).json({ error: dateErrors.join('. ') });
-  }
-  
-  const remarksText = normalizeRemarks(payload);
-  const updated = await db.updateRecord(req.params.id, { ...payload, remarks: remarksText });
-  res.json({ ...updated, remarksText });
 });
 
 app.delete('/records/:id', authMiddleware, asyncHandler(async (req, res) => {
@@ -481,6 +660,18 @@ app.delete('/records/:id', authMiddleware, asyncHandler(async (req, res) => {
   if (req.user.role === 'SECTION' && record.section !== req.user.section) {
     return res.status(403).json({ error: 'Forbidden' });
   }
+  
+  // Create audit log for deletion
+  await db.createAuditLog({
+    recordId: record.id,
+    action: 'DELETE',
+    fieldName: null,
+    oldValue: JSON.stringify(record),
+    newValue: null,
+    performedBy: req.user.username,
+    ipAddress: req.ip,
+    userAgent: req.get('user-agent')
+  });
   
   // Store section and date before deleting
   const { section, dateReceived } = record;
@@ -498,6 +689,11 @@ app.delete('/records/:id', authMiddleware, asyncHandler(async (req, res) => {
       console.warn('Control number issues detected:', validation);
     }
     
+    // Emit real-time event (includes deleter username so clients can ignore their own actions)
+    if (io) {
+      io.emit('record_deleted', { id: req.params.id, section, dateReceived, _actionBy: req.user.username });
+    }
+    
     return res.json({ 
       ok: true, 
       countersReset: resetResult,
@@ -505,8 +701,12 @@ app.delete('/records/:id', authMiddleware, asyncHandler(async (req, res) => {
     });
   } catch (resetError) {
     console.error('Error resetting counters:', resetError);
-    // Still return success for deletion even if reset fails
-    return res.json({ ok: true, warning: 'Record deleted but counter reset failed' });
+    // 207 Multi-Status: the deletion succeeded but counter reset failed
+    return res.status(207).json({
+      ok: true,
+      warning: 'Record deleted but counter reset failed',
+      resetError: resetError.message,
+    });
   }
 }));
 
@@ -530,7 +730,7 @@ app.post('/records/:id/upload', authMiddleware, upload.single('file'), async (re
   const tempPath = path.join(uploadDir, req.file.filename);
   const finalPath = path.join(targetDir, storedName);
   if (tempPath !== finalPath && fs.existsSync(tempPath)) {
-    fs.renameSync(tempPath, finalPath);
+    await fs.promises.rename(tempPath, finalPath);
   }
   const fileUrl = `/uploads/${monthFolder}/${sectionFolder}/${storedName}`;
   const updated = await db.updateRecordFile(req.params.id, { subjectFileUrl: fileUrl, updatedBy: req.user.username });
@@ -618,31 +818,166 @@ app.post('/export', authMiddleware, async (req, res) => {
   res.send(buffer);
 });
 
+// Get audit logs for a specific record
+app.get('/records/:id/audit-logs', authMiddleware, asyncHandler(async (req, res) => {
+  const record = await db.getRecord(req.params.id);
+  if (!record) return res.status(404).json({ error: 'Not found' });
+  if (req.user.role === 'SECTION' && record.section !== req.user.section) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  
+  const logs = await db.getAuditLogsForRecord(req.params.id);
+  res.json({ logs });
+}));
+
+// Get all audit logs (admin only)
+app.get('/audit-logs', authMiddleware, requireRole(['MC']), asyncHandler(async (req, res) => {
+  const { limit = '100', offset = '0' } = req.query;
+  const logs = await db.getAllAuditLogs(parseInt(limit, 10), parseInt(offset, 10));
+  res.json({ logs });
+}));
+
+// Clear all audit logs (MC only)
+app.post('/audit-logs/clear', authMiddleware, requireRole(['MC']), asyncHandler(async (req, res) => {
+  const confirm = req.body?.confirm;
+  if (confirm !== true) {
+    return res.status(400).json({ error: 'Confirmation required. Send {"confirm": true}.' });
+  }
+  const result = await db.clearAuditLogs();
+  res.json({ ok: true, ...result });
+}));
+
+// Export to CSV
+app.post('/export/csv', authMiddleware, asyncHandler(async (req, res) => {
+  const { section } = req.body;
+  let filterSection = section;
+  if (req.user.role === 'SECTION') filterSection = req.user.section;
+  const records = await db.listRecords(filterSection ? { section: filterSection } : {});
+
+  const headers = [
+    'MC Ctrl No.', 'Section Ctrl No.', 'Section', 'Date Received', 'Subject',
+    'From', 'Target Date', 'Received By', 'Action Taken', 'Remarks',
+    'Concerned Units', 'Date Sent'
+  ];
+
+  const csvRows = [];
+  csvRows.push(headers.join(','));
+
+  records.forEach((row) => {
+    const values = [
+      row.mcCtrlNo || '',
+      row.sectionCtrlNo || '',
+      row.section || '',
+      row.dateReceived || '',
+      `"${(row.subjectText || '').replace(/"/g, '""')}"`,
+      row.fromValue || '',
+      row.targetDate || '',
+      row.receivedBy || '',
+      row.actionTaken || '',
+      `"${(coerceRemarksText(row.remarks) || '').replace(/"/g, '""')}"`,
+      row.concernedUnits || '',
+      row.dateSent || '',
+    ];
+    csvRows.push(values.join(','));
+  });
+
+  const csvContent = csvRows.join('\n');
+  res.setHeader('Content-Disposition', 'attachment; filename=records.csv');
+  res.setHeader('Content-Type', 'text/csv');
+  res.send(csvContent);
+}));
+
 app.get('/config/defaults', authMiddleware, (_req, res) => {
   res.json({ from: DEFAULT_FROM, receivedBy: DEFAULT_RECEIVED_BY });
 });
 
-app.get('/users/list', (_req, res) => {
-  // Public endpoint for login dropdown
-  const users = [
-    { label: 'NUP Tala (MC)', username: 'NUP Tala', role: 'MC', section: null },
-    { label: 'PMSG Foncardas (MC)', username: 'PMSG Foncardas', role: 'MC', section: null },
-    { label: 'NUP Tala (INVES)', username: 'NUP Tala - INVES', role: 'SECTION', section: 'INVES' },
-    { label: 'NUP San Pedro (ADM)', username: 'NUP San Pedro', role: 'SECTION', section: 'ADM' },
-    { label: 'PMSG Foncardas (ADM)', username: 'PMSG Foncardas - ADM', role: 'SECTION', section: 'ADM' },
-    { label: 'NUP Aldrin (OPN)', username: 'NUP Aldrin', role: 'SECTION', section: 'OPN' },
-    { label: 'PCPL Bueno (OPN)', username: 'PCPL Bueno', role: 'SECTION', section: 'OPN' },
-    { label: 'PAT Duyag (OPN)', username: 'PAT Duyag', role: 'SECTION', section: 'OPN' },
-    { label: 'NUP Joyce (INTEL)', username: 'NUP Joyce', role: 'SECTION', section: 'INTEL' },
-    { label: 'PCPL Jose (INTEL)', username: 'PCPL Jose', role: 'SECTION', section: 'INTEL' },
-  ];
+// ── User Management (MC-only CRUD) ────────────────────────────────────────────
+
+// GET /users/list — for login dropdowns (authenticated, no passwords exposed)
+app.get('/users/list', authMiddleware, asyncHandler(async (_req, res) => {
+  const rows = await db.listUsers();
+  const users = rows
+    .filter((u) => u.isActive === 1 || u.isActive === true)
+    .map((u) => ({
+      id: u.id,
+      label: u.section ? `${u.username} (${u.section})` : `${u.username} (${u.role})`,
+      username: u.username,
+      role: u.role,
+      section: u.section || null,
+    }));
   res.json({ users });
-});
+}));
 
-app.use('/uploads', express.static(uploadDir));
+// GET /users — full list for admin panel (MC only)
+app.get('/users', authMiddleware, requireRole(['MC']), asyncHandler(async (_req, res) => {
+  const users = await db.listUsers();
+  res.json({ users });
+}));
 
-// Apply rate limiting to all authenticated API routes
-app.use(authMiddleware, apiLimiter);
+// POST /users — create new user (MC only)
+app.post('/users', authMiddleware, requireRole(['MC']), asyncHandler(async (req, res) => {
+  const { username, password, role, section } = sanitizeInput(req.body);
+  if (!username || !password || !role) {
+    return res.status(400).json({ error: 'username, password, and role are required' });
+  }
+  if (!['MC', 'SECTION'].includes(role)) {
+    return res.status(400).json({ error: 'role must be MC or SECTION' });
+  }
+  if (role === 'SECTION' && !section) {
+    return res.status(400).json({ error: 'section is required for SECTION role' });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'password must be at least 6 characters' });
+  }
+  const existing = await db.getUserByUsername(username);
+  if (existing) {
+    return res.status(409).json({ error: 'Username already exists' });
+  }
+  const hashed = await bcrypt.hash(password, 10);
+  const created = await db.createUser({ username, password: hashed, role, section: section || null });
+  res.status(201).json({
+    user: { id: created.id, username: created.username, role: created.role, section: created.section, isActive: created.isActive },
+  });
+}));
+
+// PUT /users/:id — update user fields (MC only)
+app.put('/users/:id', authMiddleware, requireRole(['MC']), asyncHandler(async (req, res) => {
+  const { password, role, section, isActive, username } = sanitizeInput(req.body);
+  const target = await db.getUserById(Number(req.params.id));
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  // Prevent self-deactivation
+  if (target.username === req.user.username && (isActive === 0 || isActive === false)) {
+    return res.status(400).json({ error: 'Cannot deactivate your own account' });
+  }
+  const fields = {};
+  if (password !== undefined && password !== '') {
+    if (password.length < 6) return res.status(400).json({ error: 'password must be at least 6 characters' });
+    fields.password = await bcrypt.hash(password, 10);
+  }
+  if (role !== undefined) fields.role = role;
+  if (section !== undefined) fields.section = section || null;
+  if (isActive !== undefined) fields.isActive = isActive;
+  if (username !== undefined && username !== '') fields.username = username;
+
+  const updated = await db.updateUser(Number(req.params.id), fields);
+  res.json({
+    user: { id: updated.id, username: updated.username, role: updated.role, section: updated.section, isActive: updated.isActive },
+  });
+}));
+
+// DELETE /users/:id — permanently remove user (MC only)
+app.delete('/users/:id', authMiddleware, requireRole(['MC']), asyncHandler(async (req, res) => {
+  const target = await db.getUserById(Number(req.params.id));
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  if (target.username === req.user.username) {
+    return res.status(400).json({ error: 'Cannot delete your own account' });
+  }
+  await db.deleteUser(Number(req.params.id));
+  res.json({ ok: true });
+}));
+
+// Serve uploaded files — authentication required to prevent unauthorised file access
+app.use('/uploads', authMiddleware, express.static(uploadDir));
 
 // Global Error Handler (must be last) 
 app.use((err, req, res, next) => {
@@ -678,16 +1013,113 @@ app.use((err, req, res, next) => {
 
 // Initialize database and start server
 let server;
+let io;
 
 async function startServer() {
   await initDb();
   await seedUsers();
   const port = Number(process.env.PORT || 5000);
-  server = app.listen(port, () => {
-    console.log(`API listening on ${port} using ${isSqlite ? 'SQLite' : 'Postgres'}`);
+  const host = '0.0.0.0'; // Listen on all network interfaces
+  
+  // Serve React build files in production (after all API routes)
+  const buildPath = path.join(__dirname, '..', 'build');
+  if (fs.existsSync(buildPath)) {
+    app.use(
+      express.static(buildPath, {
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-store');
+          }
+        },
+      })
+    );
+
+    // Send all non-API requests to React app
+    // NOTE: Express 5 (path-to-regexp) does not accept the legacy "*" route.
+    // Use a regex catch-all instead.
+    app.get(/.*/, (req, res, next) => {
+      if (req.path.startsWith('/uploads/')) return next();
+      if (req.path.startsWith('/auth/') || req.path.startsWith('/records') || req.path.startsWith('/users') || req.path.startsWith('/audit-logs') || req.path.startsWith('/control-numbers') || req.path.startsWith('/export') || req.path.startsWith('/config')) {
+        return next();
+      }
+      res.setHeader('Cache-Control', 'no-store');
+      res.sendFile(path.join(buildPath, 'index.html'));
+    });
+  }
+  
+  server = app.listen(port, host, () => {
+    console.log(`API listening on ${host}:${port} using ${isSqlite ? 'SQLite' : 'Postgres'}`);
+    console.log(`Local:   http://localhost:${port}`);
+    console.log(`Network: http://10.42.11.207:${port}`);
   });
+  
+  // Initialize Socket.IO
+  io = new Server(server, {
+    cors: {
+      origin: process.env.ALLOWED_ORIGINS?.split(',') || [
+        'http://localhost:3000',
+        'http://localhost:5000',
+        'http://192.168.254.193:5000',
+        'http://10.42.11.207:5000'  // ZeroTier IP
+      ],
+      credentials: true
+    }
+  });
+  
+  // Socket.IO authentication middleware
+  io.use((socket, next) => {
+    const token = socket.handshake.auth.token;
+    if (!token) {
+      return next(new Error('Authentication required'));
+    }
+    
+    try {
+      const decoded = jwt.verify(token, jwtSecret);
+      socket.user = decoded;
+      next();
+    } catch (err) {
+      next(new Error('Invalid token'));
+    }
+  });
+  
+  // Socket.IO connection handling
+  io.on('connection', (socket) => {
+    console.log(`User connected: ${socket.user.username} (${socket.user.role})`);
+    
+    socket.on('disconnect', () => {
+      console.log(`User disconnected: ${socket.user.username}`);
+    });
+  });
+  
   return server;
 }
+
+// ── Graceful Shutdown ────────────────────────────────────────────────────────
+function gracefulShutdown(signal) {
+  console.log(`\nReceived ${signal}. Shutting down gracefully…`);
+  if (server) {
+    server.close(async () => {
+      console.log('HTTP server closed.');
+      try {
+        await db.closeDb();
+        console.log('Database connection closed.');
+      } catch (err) {
+        console.error('Error closing database:', err);
+      }
+      process.exit(0);
+    });
+    // Force exit after 10 s if the server takes too long to drain
+    setTimeout(() => {
+      console.error('Forced shutdown after timeout.');
+      process.exit(1);
+    }, 10_000).unref();
+  } else {
+    process.exit(0);
+  }
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Only start server if not in test mode
 if (process.env.NODE_ENV !== 'test') {
@@ -695,4 +1127,4 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // Export for testing
-module.exports = { app, server, startServer };
+module.exports = { app, server, io, startServer };

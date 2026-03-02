@@ -1,0 +1,85 @@
+╔══════════════════════════════════════════════════════════════╗
+║                  ✅ READY TO TRANSFER!                       ║
+╚══════════════════════════════════════════════════════════════╝
+
+📦 FILE TO TRANSFER:
+   DMS-Transfer.zip  (~200 MB)
+
+📁 LOCATION:
+   C:\Users\FRANCIS\Documents\DMS\DMS-Transfer.zip
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 WHAT TO DO NOW:
+
+1. Copy DMS-Transfer.zip to:
+   ☐ USB flash drive, OR
+   ☐ Upload to Google Drive/OneDrive, OR  
+   ☐ Email to yourself
+
+2. On new computer:
+   ☐ Install Node.js from nodejs.org (one time only)
+   ☐ Extract DMS-Transfer.zip
+   ☐ Run INSTALL.bat
+   ☐ Run START-DMS.bat
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 WHAT'S INCLUDED:
+
+✅ Your entire app
+✅ SQLite database with ALL your data
+✅ All uploaded PDF files  
+✅ All configurations
+✅ All users and settings
+✅ Startup scripts
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💻 ON NEW COMPUTER:
+
+Step 1: Install Node.js
+   https://nodejs.org → Download LTS → Install
+
+Step 2: Extract ZIP
+   Right-click DMS-Transfer.zip → Extract All
+
+Step 3: Install
+   Open DMS-Transfer folder → Double-click INSTALL.bat
+
+Step 4: Run
+   Double-click START-DMS.bat
+   Open browser to http://localhost:5000
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️  IMPORTANT:
+
+• Node.js is FREE from nodejs.org
+• NO VS Code needed!
+• NO Git needed!
+• Setup takes only 5-10 minutes
+• All your data transfers automatically!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🆘 IF PROBLEMS ON NEW COMPUTER:
+
+Problem: "node is not recognized"
+Fix: Install Node.js, restart computer
+
+Problem: "Port already in use"  
+Fix: Restart computer, run START-DMS.bat again
+
+Problem: Can't find database
+Fix: Make sure you extracted the entire ZIP
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ YOU'RE READY! Copy DMS-Transfer.zip and you're good to go!
+
+╔══════════════════════════════════════════════════════════════╗
+║  File: DMS-Transfer.zip                                      ║
+║  Size: ~200 MB                                               ║
+║  Contains: EVERYTHING you need!                              ║
+╚══════════════════════════════════════════════════════════════╝
