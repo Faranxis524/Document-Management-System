@@ -1,4 +1,4 @@
-import logo from '../assets/logo.png';
+import logo from '../assets/cidg-logo.svg';
 import { SECTION_LABELS } from '../constants';
 
 export default function Sidebar({ navItems, activeSection, setActiveSection, isMc, currentUser, handleLogout }) {

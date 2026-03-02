@@ -1,5 +1,5 @@
 import loginBg from '../assets/login-bg.png';
-import logo from '../assets/logo.png';
+import logo from '../assets/cidg-logo.svg';
 
 export default function LoginPage({
   username,
