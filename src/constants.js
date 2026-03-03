@@ -56,9 +56,9 @@ export const TABLE_COLUMNS = [
 ];
 
 export const REPORT_SIGNATORIES = [
-  { name: 'Catherine Batalon', position: 'Chief' },
-  { name: 'Francis Dave', position: 'PLTCOL' },
-  { name: 'Athena Almendral', position: 'Admin Operation' },
+  { name: '', position: 'Admin PNCO' },
+  { name: '', position: 'Chief, Admin Section' },
+  { name: '', position: 'Regional Chief' },
 ];
 
 export const MC_NAV_ITEMS = [

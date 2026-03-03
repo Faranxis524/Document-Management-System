@@ -79,9 +79,9 @@ const TABLE_COLUMNS = [
 ];
 
 const REPORT_SIGNATORIES = [
-  { name: 'Catherine Batalon', position: 'Chief' },
-  { name: 'Francis Dave', position: 'PLTCOL' },
-  { name: 'Athena Almendral', position: 'Admin Operation' },
+  { name: '', position: 'Admin PNCO' },
+  { name: '', position: 'Chief, Admin Section' },
+  { name: '', position: 'Regional Chief' },
 ];
 
 const MC_NAV_ITEMS = ['MC Master List', ...SECTIONS.map((section) => SECTION_LABELS[section])];
