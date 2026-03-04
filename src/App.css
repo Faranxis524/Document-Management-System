@@ -811,7 +811,8 @@ textarea:focus {
   background: var(--white);
   border-radius: 0 0 12px 12px;
   overflow-x: auto;
-  overflow-y: visible;
+  overflow-y: auto;
+  max-height: calc(100vh - 195px);
   min-height: 0;
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.04);
 }
@@ -830,6 +831,9 @@ textarea:focus {
   font-size: 12px;
   font-weight: 600;
   border-bottom: 2px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 3;
 }
 
 .table__row--clickable {
@@ -1277,6 +1281,7 @@ textarea:focus {
 
 .table__grid--expanded {
   overflow: auto;
+  max-height: calc(90vh - 70px);
 }
 
 .table__row--expanded {
