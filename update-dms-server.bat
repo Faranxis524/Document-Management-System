@@ -87,7 +87,7 @@ echo ========================================
 echo    Update Complete
 echo ========================================
 echo DMS is now running with the latest version.
-echo Open: http://localhost:5000
+echo Open: http://10.163.253.16:5000
 echo      or http://10.163.253.16:5000
 echo.
 pause

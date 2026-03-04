@@ -20,7 +20,7 @@ if not exist "%~dp0build" (
 
 echo Starting DMS Production Server...
 echo.
-echo Backend + Frontend: http://localhost:5000
+echo Backend + Frontend: http://10.163.253.16:5000
 echo.
 
 REM Start the server
@@ -31,7 +31,7 @@ echo.
 echo ===========================================
 echo DMS is starting in production mode...
 echo.
-echo Open your browser to: http://localhost:5000
+echo Open your browser to: http://10.163.253.16:5000
 echo.
 echo Keep the server window open while using DMS.
 echo ===========================================

@@ -16,7 +16,7 @@ start "DMS Frontend" cmd /k "cd /d %~dp0 && npm start"
 
 echo.
 echo DMS servers are starting...
-echo Backend: http://localhost:5000
+echo Backend: http://10.163.253.16:5000
 echo Frontend: http://localhost:3000
 echo.
 echo Keep both windows open while using the system.
