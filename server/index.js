@@ -138,6 +138,7 @@ const DEFAULT_FROM = {
   OPN: 'OMD',
   INTEL: 'ID',
   ADM: 'ARMD',
+  'OPN/PCR': 'PCRS',
 };
 
 const DEFAULT_RECEIVED_BY = {
@@ -145,6 +146,7 @@ const DEFAULT_RECEIVED_BY = {
   OPN: ['NUP Aldrin', 'PCPL Bueno', 'PAT Duyag'],
   INTEL: ['NUP Joyce', 'PCPL Jose'],
   ADM: ['NUP San Pedro', 'PMSG Foncardas'],
+  'OPN/PCR': [],
 };
 
 function signToken(user) {
@@ -381,7 +383,7 @@ app.get('/users/me', authMiddleware, (req, res) => {
 });
 
 app.get('/sections', (_req, res) => {
-  res.json({ sections: ['INVES', 'INTEL', 'ADM', 'OPN'] });
+  res.json({ sections: ['INVES', 'INTEL', 'ADM', 'OPN', 'OPN/PCR'] });
 });
 
 async function getNextControlNumbers(section, dateReceived, preview = false) {
@@ -454,6 +456,9 @@ app.post('/records', authMiddleware, async (req, res) => {
     fieldName: null,
     oldValue: null,
     newValue: JSON.stringify(record),
+    section: record.section,
+    sectionCtrlNo: record.sectionCtrlNo,
+    mcCtrlNo: record.mcCtrlNo,
     performedBy: req.user.username,
     ipAddress: req.ip,
     userAgent: req.get('user-agent')
@@ -644,6 +649,9 @@ app.put('/records/:id', authMiddleware, async (req, res) => {
         fieldName: change.fieldName,
         oldValue: change.oldValue,
         newValue: change.newValue,
+        section: record.section,
+        sectionCtrlNo: record.sectionCtrlNo,
+        mcCtrlNo: record.mcCtrlNo,
         performedBy: req.user.username,
         ipAddress: req.ip,
         userAgent: req.get('user-agent')
@@ -687,6 +695,9 @@ app.delete('/records/:id', authMiddleware, asyncHandler(async (req, res) => {
     fieldName: null,
     oldValue: JSON.stringify(record),
     newValue: null,
+    section: record.section,
+    sectionCtrlNo: record.sectionCtrlNo,
+    mcCtrlNo: record.mcCtrlNo,
     performedBy: req.user.username,
     ipAddress: req.ip,
     userAgent: req.get('user-agent')

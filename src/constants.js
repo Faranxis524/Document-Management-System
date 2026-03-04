@@ -16,13 +16,14 @@ export const USERS = [
   { label: 'PCPL Jose (INTEL)', username: 'PCPL Jose', role: 'SECTION', section: 'INTEL' },
 ];
 
-export const SECTIONS = ['INVES', 'INTEL', 'ADM', 'OPN'];
+export const SECTIONS = ['INVES', 'INTEL', 'ADM', 'OPN', 'OPN/PCR'];
 
 export const SECTION_LABELS = {
   INVES: 'Investigation Section',
   INTEL: 'Intelligence Section',
   ADM: 'Admin Section',
   OPN: 'Operation Section',
+  'OPN/PCR': 'PCR Section',
 };
 
 export const DEFAULT_FROM = {
@@ -30,6 +31,7 @@ export const DEFAULT_FROM = {
   OPN: 'OMD',
   INTEL: 'ID',
   ADM: 'ARMD',
+  'OPN/PCR': 'PCRS',
 };
 
 export const RECEIVED_BY = {
@@ -37,6 +39,7 @@ export const RECEIVED_BY = {
   OPN: ['NUP Aldrin', 'PCPL Bueno', 'PAT Duyag'],
   INTEL: ['NUP Joyce', 'PCPL Jose'],
   ADM: ['NUP San Pedro', 'PMSG Foncardas'],
+  'OPN/PCR': [],
 };
 
 export const TABLE_COLUMNS = [

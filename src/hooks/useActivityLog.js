@@ -98,7 +98,35 @@ export function useActivityLog({ authToken, activeSection, showToast }) {
   const loadActivityLogs = async () => {
     try {
       const response = await apiFetch('/audit-logs?limit=500&offset=0');
-      setActivityLogs(response.logs || []);
+      const raw = response.logs || [];
+
+      // Build a map: recordId → best-known { section, sectionCtrlNo, mcCtrlNo }
+      // Prefer data from columns; fall back to JSON snapshot in CREATE/DELETE payloads.
+      const infoMap = {};
+      for (const log of raw) {
+        const id = log.recordId;
+        if (!id) continue;
+        if (infoMap[id]) continue; // already found for this record
+        const s = log.section;
+        const sc = log.sectionCtrlNo;
+        const mc = log.mcCtrlNo;
+        if (s || sc || mc) { infoMap[id] = { section: s, sectionCtrlNo: sc, mcCtrlNo: mc }; continue; }
+        // Try to parse from JSON snapshot (CREATE newValue or DELETE oldValue)
+        const snap = getRecordSnapshotFromLog(log);
+        if (snap && (snap.section || snap.sectionCtrlNo || snap.mcCtrlNo)) {
+          infoMap[id] = { section: snap.section, sectionCtrlNo: snap.sectionCtrlNo, mcCtrlNo: snap.mcCtrlNo };
+        }
+      }
+
+      // Enrich any log that is still missing section/ctrlNo (e.g. old UPDATE rows)
+      const enriched = raw.map((log) => {
+        if (log.section || log.sectionCtrlNo || log.mcCtrlNo) return log;
+        const info = infoMap[log.recordId];
+        if (!info) return log;
+        return { ...log, section: info.section || null, sectionCtrlNo: info.sectionCtrlNo || null, mcCtrlNo: info.mcCtrlNo || null };
+      });
+
+      setActivityLogs(enriched);
     } catch (error) {
       showToast('error', 'Error', `Failed to load activity logs: ${error.message}`);
     }

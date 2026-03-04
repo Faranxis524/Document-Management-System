@@ -37,7 +37,11 @@ export default function ActivityLog({
                     <td>{log.performedAt ? new Date(log.performedAt).toLocaleString() : '-'}</td>
                     <td>{getLogSection(log) || '-'}</td>
                     <td>{getLogSectionCtrlNo(log) || '-'}</td>
-                    <td className="activity-log-action">{normalizeAuditAction(log.action) || '-'}</td>
+                    <td>
+                      <span className={`activity-log-action-badge activity-log-action-badge--${(normalizeAuditAction(log.action) || 'other').toLowerCase()}`}>
+                        {normalizeAuditAction(log.action) || '-'}
+                      </span>
+                    </td>
                     <td>
                       <span
                         className="activity-log-cell activity-log-cell--details"

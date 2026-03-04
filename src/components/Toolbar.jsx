@@ -65,28 +65,27 @@ export default function Toolbar({
   if (activeSection === 'Activity Log') {
     return (
       <div className="toolbar">
-        <div className="activity-log-toolbar">
-          <span className="activity-log-toolbar__label">Search:</span>
+        <div className="toolbar__row toolbar__row--main">
           <input
             className="toolbar__input"
-            placeholder="Search action or details"
+            placeholder="Search logs…"
             value={activityLogSearch}
             onChange={(e) => setActivityLogSearch(e.target.value)}
           />
-          <span className="activity-log-toolbar__label">Action:</span>
           <select
             value={activityLogActionFilter}
             onChange={(e) => setActivityLogActionFilter(e.target.value)}
             className={activityLogActionFilter !== 'ALL' ? 'filter-active' : ''}
           >
-            <option value="ALL">All</option>
+            <option value="ALL">All Actions</option>
             <option value="CREATE">Create</option>
             <option value="UPDATE">Update</option>
             <option value="DELETE">Delete</option>
             <option value="OTHER">Other</option>
           </select>
-        </div>
-        <div className="toolbar__filters">
+          {activityLogActionFilter !== 'ALL' && (
+            <button type="button" className="toolbar__clear-filters" onClick={() => setActivityLogActionFilter('ALL')}>Clear</button>
+          )}
           {apiError && <div className="form-panel__error">{apiError}</div>}
         </div>
       </div>

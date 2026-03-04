@@ -90,6 +90,11 @@ async function initDb() {
     } catch (err) {
       // Column already exists, ignore error
     }
+
+    // Add section/ctrl-no columns to audit_logs (idempotent migration)
+    for (const col of ['section TEXT', 'sectionCtrlNo TEXT', 'mcCtrlNo TEXT']) {
+      try { await runSqlite(`ALTER TABLE audit_logs ADD COLUMN ${col};`); } catch (_) {}
+    }
     
     // Create audit_logs table
     await runSqlite(`
@@ -193,6 +198,11 @@ async function initDb() {
       await pgPool.query(`ALTER TABLE users ADD COLUMN permissions TEXT DEFAULT '{}';`);
     } catch (err) {
       // Column already exists, ignore error
+    }
+
+    // Add section/ctrl-no columns to audit_logs (idempotent migration)
+    for (const col of ['section TEXT', '"sectionCtrlNo" TEXT', '"mcCtrlNo" TEXT']) {
+      try { await pgPool.query(`ALTER TABLE audit_logs ADD COLUMN ${col};`); } catch (_) {}
     }
     
     // Create audit_logs table
@@ -914,17 +924,17 @@ async function getUserById(id) {
 }
 
 // Audit Log Functions
-async function createAuditLog({ recordId, action, fieldName, oldValue, newValue, performedBy, ipAddress, userAgent }) {
+async function createAuditLog({ recordId, action, fieldName, oldValue, newValue, section, sectionCtrlNo, mcCtrlNo, performedBy, ipAddress, userAgent }) {
   const now = new Date().toISOString();
   if (isSqlite) {
     await runSqlite(
-      'INSERT INTO audit_logs (recordId, action, fieldName, oldValue, newValue, performedBy, performedAt, ipAddress, userAgent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);',
-      [recordId, action, fieldName, oldValue, newValue, performedBy, now, ipAddress, userAgent]
+      'INSERT INTO audit_logs (recordId, action, fieldName, oldValue, newValue, section, sectionCtrlNo, mcCtrlNo, performedBy, performedAt, ipAddress, userAgent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);',
+      [recordId, action, fieldName, oldValue, newValue, section || null, sectionCtrlNo || null, mcCtrlNo || null, performedBy, now, ipAddress, userAgent]
     );
   } else {
     await pgPool.query(
-      'INSERT INTO audit_logs (recordId, action, fieldName, oldValue, newValue, performedBy, performedAt, ipAddress, userAgent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);',
-      [recordId, action, fieldName, oldValue, newValue, performedBy, now, ipAddress, userAgent]
+      'INSERT INTO audit_logs (recordId, action, fieldName, oldValue, newValue, section, "sectionCtrlNo", "mcCtrlNo", performedBy, performedAt, ipAddress, userAgent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);',
+      [recordId, action, fieldName, oldValue, newValue, section || null, sectionCtrlNo || null, mcCtrlNo || null, performedBy, now, ipAddress, userAgent]
     );
   }
 }
@@ -932,7 +942,11 @@ async function createAuditLog({ recordId, action, fieldName, oldValue, newValue,
 async function getAuditLogsForRecord(recordId) {
   if (isSqlite) {
     return await allSqlite(
-      "SELECT al.*, r.section AS section, r.sectionCtrlNo AS sectionCtrlNo, r.mcCtrlNo AS mcCtrlNo " +
+      "SELECT al.id, al.recordId, al.action, al.fieldName, al.oldValue, al.newValue, " +
+        "al.performedBy, al.performedAt, al.ipAddress, al.userAgent, " +
+        "COALESCE(al.section, r.section) AS section, " +
+        "COALESCE(al.sectionCtrlNo, r.sectionCtrlNo) AS sectionCtrlNo, " +
+        "COALESCE(al.mcCtrlNo, r.mcCtrlNo) AS mcCtrlNo " +
         "FROM audit_logs al " +
         "LEFT JOIN records r ON r.id = al.recordId " +
         "WHERE al.recordId = ? AND al.action IS NOT NULL AND TRIM(al.action) <> '' " +
@@ -941,11 +955,15 @@ async function getAuditLogsForRecord(recordId) {
     );
   }
   const result = await pgPool.query(
-    "SELECT al.*, r.section AS section, r.sectionctrlno AS \"sectionCtrlNo\", r.mcctrlno AS \"mcCtrlNo\" " +
+    "SELECT al.id, al.\"recordId\", al.action, al.\"fieldName\", al.\"oldValue\", al.\"newValue\", " +
+      "al.\"performedBy\", al.\"performedAt\", " +
+      "COALESCE(al.section, r.section) AS section, " +
+      "COALESCE(al.\"sectionCtrlNo\", r.\"sectionCtrlNo\") AS \"sectionCtrlNo\", " +
+      "COALESCE(al.\"mcCtrlNo\", r.\"mcCtrlNo\") AS \"mcCtrlNo\" " +
       "FROM audit_logs al " +
-      "LEFT JOIN records r ON r.id = al.recordId " +
-      "WHERE al.recordId = $1 AND al.action IS NOT NULL AND BTRIM(al.action) <> '' " +
-      "ORDER BY al.performedAt DESC;",
+      "LEFT JOIN records r ON r.id = al.\"recordId\" " +
+      "WHERE al.\"recordId\" = $1 AND al.action IS NOT NULL AND BTRIM(al.action) <> '' " +
+      "ORDER BY al.\"performedAt\" DESC;",
     [recordId]
   );
   return result.rows;
@@ -954,7 +972,11 @@ async function getAuditLogsForRecord(recordId) {
 async function getAllAuditLogs(limit = 100, offset = 0) {
   if (isSqlite) {
     return await allSqlite(
-      "SELECT al.*, r.section AS section, r.sectionCtrlNo AS sectionCtrlNo, r.mcCtrlNo AS mcCtrlNo " +
+      "SELECT al.id, al.recordId, al.action, al.fieldName, al.oldValue, al.newValue, " +
+        "al.performedBy, al.performedAt, al.ipAddress, al.userAgent, " +
+        "COALESCE(al.section, r.section) AS section, " +
+        "COALESCE(al.sectionCtrlNo, r.sectionCtrlNo) AS sectionCtrlNo, " +
+        "COALESCE(al.mcCtrlNo, r.mcCtrlNo) AS mcCtrlNo " +
         "FROM audit_logs al " +
         "LEFT JOIN records r ON r.id = al.recordId " +
         "WHERE al.action IS NOT NULL AND TRIM(al.action) <> '' " +
@@ -963,11 +985,15 @@ async function getAllAuditLogs(limit = 100, offset = 0) {
     );
   }
   const result = await pgPool.query(
-    "SELECT al.*, r.section AS section, r.sectionctrlno AS \"sectionCtrlNo\", r.mcctrlno AS \"mcCtrlNo\" " +
+    "SELECT al.id, al.\"recordId\", al.action, al.\"fieldName\", al.\"oldValue\", al.\"newValue\", " +
+      "al.\"performedBy\", al.\"performedAt\", " +
+      "COALESCE(al.section, r.section) AS section, " +
+      "COALESCE(al.\"sectionCtrlNo\", r.\"sectionCtrlNo\") AS \"sectionCtrlNo\", " +
+      "COALESCE(al.\"mcCtrlNo\", r.\"mcCtrlNo\") AS \"mcCtrlNo\" " +
       "FROM audit_logs al " +
-      "LEFT JOIN records r ON r.id = al.recordId " +
+      "LEFT JOIN records r ON r.id = al.\"recordId\" " +
       "WHERE al.action IS NOT NULL AND BTRIM(al.action) <> '' " +
-      "ORDER BY al.performedAt DESC LIMIT $1 OFFSET $2;",
+      "ORDER BY al.\"performedAt\" DESC LIMIT $1 OFFSET $2;",
     [limit, offset]
   );
   return result.rows;
