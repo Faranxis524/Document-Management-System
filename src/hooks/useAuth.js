@@ -11,13 +11,43 @@ function getTokenExpiry(token) {
   }
 }
 
+const STORAGE_TOKEN_KEY = 'dms_auth_token';
+const STORAGE_USER_KEY  = 'dms_auth_user';
+
+/** Read a stored token and return it only if it has not expired yet */
+function loadStoredToken() {
+  try {
+    const token = localStorage.getItem(STORAGE_TOKEN_KEY);
+    if (!token) return '';
+    const expiry = getTokenExpiry(token);
+    if (expiry && expiry < Date.now()) {
+      localStorage.removeItem(STORAGE_TOKEN_KEY);
+      localStorage.removeItem(STORAGE_USER_KEY);
+      return '';
+    }
+    return token;
+  } catch {
+    return '';
+  }
+}
+
+/** Read the stored user object */
+function loadStoredUser() {
+  try {
+    const raw = localStorage.getItem(STORAGE_USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function useAuth() {
-  const [authToken, setAuthToken] = useState('');
+  const [authToken, setAuthToken] = useState(() => loadStoredToken());
   const [username, setUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [apiError, setApiError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null); // populated from server after login
+  const [currentUser, setCurrentUser] = useState(() => loadStoredUser());
   const refreshTimerRef = useRef(null);
 
   const isMc = currentUser?.role === 'MC';
@@ -39,7 +69,10 @@ export function useAuth() {
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.token) setAuthToken(data.token);
+          if (data.token) {
+            setAuthToken(data.token);
+            localStorage.setItem(STORAGE_TOKEN_KEY, data.token);
+          }
         }
       } catch {
         // silent — user will see a 401 on next API call if this fails
@@ -74,6 +107,8 @@ export function useAuth() {
       const loggedUser = data.user; // { username, role, section }
       setAuthToken(data.token);
       setCurrentUser(loggedUser);
+      localStorage.setItem(STORAGE_TOKEN_KEY, data.token);
+      localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(loggedUser));
 
       // Pre-fill section context for SECTION role users
       const sectionDefaults =
@@ -101,6 +136,8 @@ export function useAuth() {
     setCurrentUser(null);
     setUsername('');
     setApiError('');
+    localStorage.removeItem(STORAGE_TOKEN_KEY);
+    localStorage.removeItem(STORAGE_USER_KEY);
   };
 
   return {

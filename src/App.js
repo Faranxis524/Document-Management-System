@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import './App.css';
 
-import { SECTION_LABELS, MC_NAV_ITEMS, parseSections } from './constants';
+import { SECTION_LABELS, MC_NAV_ITEMS, DEFAULT_FROM, RECEIVED_BY, parseSections } from './constants';
 import { useToast } from './hooks/useToast';
 import { useAuth } from './hooks/useAuth';
 import { useRecords } from './hooks/useRecords';
@@ -21,10 +21,35 @@ import ToastContainer from './components/ToastContainer';
 import UserManagement from './components/UserManagement';
 
 function App() {
-  const [view, setView] = useState('login');
-  const [activeSection, setActiveSection] = useState('MC Master List');
+  const [view, setView] = useState(() => {
+    // Restore session: if a non-expired token is already in localStorage, skip login screen
+    try {
+      const token = localStorage.getItem('dms_auth_token');
+      if (!token) return 'login';
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (payload.exp && payload.exp * 1000 < Date.now()) return 'login';
+      return 'dashboard';
+    } catch {
+      return 'login';
+    }
+  });
+  const [activeSection, setActiveSection] = useState(() => {
+    try {
+      const raw = localStorage.getItem('dms_auth_user');
+      if (!raw) return 'MC Master List';
+      const user = JSON.parse(raw);
+      if (user.role === 'SECTION' && user.section) {
+        const sections = parseSections(user.section);
+        return SECTION_LABELS[sections[0]] || 'MC Master List';
+      }
+      return 'MC Master List';
+    } catch {
+      return 'MC Master List';
+    }
+  });
   const [isTableExpanded, setIsTableExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const sessionRestoredRef = useRef(false);
 
   // ── Hooks ──────────────────────────────────────────────────────────────────
   const { toasts, showToast, dismissToast } = useToast();
@@ -96,6 +121,24 @@ function App() {
     const labels = userSections.map((s) => SECTION_LABELS[s]).filter(Boolean);
     return labels.length ? [...labels, 'Activity Log'] : [];
   }, [isMc, currentUser]);
+
+  // Apply form defaults once when a SECTION user session is restored from localStorage
+  useEffect(() => {
+    if (sessionRestoredRef.current) return;
+    sessionRestoredRef.current = true;
+    if (!currentUser || currentUser.role !== 'SECTION' || !currentUser.section) return;
+    const sections = parseSections(currentUser.section);
+    const sec = sections[0];
+    if (!sec) return;
+    setRecordForm((prev) => ({
+      ...prev,
+      section: sec,
+      fromValue: DEFAULT_FROM[sec] || prev.fromValue,
+      concernedUnits: DEFAULT_FROM[sec] || prev.concernedUnits,
+      receivedBy: RECEIVED_BY[sec]?.[0] || '',
+    }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser]);
 
   // ── Auth handlers ──────────────────────────────────────────────────────────
   const handleLogin = () =>

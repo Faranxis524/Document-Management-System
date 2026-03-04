@@ -1251,6 +1251,28 @@ textarea:focus {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  margin-bottom: 12px;
+}
+
+.modal__table-header button.secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-light);
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modal__table-header button.secondary:hover {
+  background: var(--border-light);
+  color: var(--text);
+  border-color: var(--blue-400);
 }
 
 .table__grid--expanded {
@@ -1259,8 +1281,16 @@ textarea:focus {
 
 .table__row--expanded {
   /* Keep readable widths per column and allow horizontal scroll in expanded view */
-  min-width: 1800px;
-  grid-template-columns: 160px 160px 110px 120px 280px 100px 120px 160px 140px 200px 180px 120px 110px;
+  min-width: 1920px;
+  grid-template-columns: 200px 200px 110px 120px 280px 100px 120px 160px 140px 200px 180px 120px 110px;
+}
+
+/* Prevent ctrl-number cells from wrapping at hyphens */
+.table__row--expanded .table__cell:nth-child(1),
+.table__row--expanded .table__cell:nth-child(2) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .modal__grid {
