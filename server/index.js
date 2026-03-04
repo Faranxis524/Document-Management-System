@@ -242,9 +242,7 @@ function validateDates(payload) {
   
   // Non-date strings (e.g. 'daily', 'N/A', 'after 3 days') are allowed as text descriptions — no validation needed
   
-  if (dateSent && !/^\d{4}-\d{2}-\d{2}$/.test(dateSent) && dateSent !== '') {
-    errors.push('Date sent must be in YYYY-MM-DD format');
-  }
+  // Non-date strings for dateSent (e.g. 'weekly', 'N/A') are allowed as text descriptions — no validation needed
   
   // Validate date logic only if dates are in proper format
   if (dateReceived && targetDate && /^\d{4}-\d{2}-\d{2}$/.test(dateReceived) && /^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {

@@ -318,9 +318,23 @@ export default function RecordForm({
           )}
 
           <label>
+            Date Sent Mode
+            <select
+              value={recordForm.dateSentMode || 'DATE'}
+              onChange={(e) =>
+                setRecordForm((prev) => ({ ...prev, dateSentMode: e.target.value, dateSent: '' }))
+              }
+            >
+              <option value="DATE">Date Picker</option>
+              <option value="TEXT">User Input</option>
+            </select>
+          </label>
+
+          <label>
             Date Sent
             <input
-              type="date"
+              type={(recordForm.dateSentMode || 'DATE') === 'DATE' ? 'date' : 'text'}
+              placeholder={(recordForm.dateSentMode || 'DATE') === 'DATE' ? '' : 'Enter date sent'}
               value={recordForm.dateSent}
               onChange={(e) => setRecordForm((prev) => ({ ...prev, dateSent: e.target.value }))}
             />

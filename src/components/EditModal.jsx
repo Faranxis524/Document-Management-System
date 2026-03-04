@@ -38,7 +38,7 @@ export default function EditModal({
     const fields = ['section', 'dateReceived', 'subjectText', 'fromValue', 'fromCustom',
       'targetDate', 'targetDateMode', 'receivedBy', 'receivedByCustom',
       'actionTaken', 'actionTakenCustom', 'concernedUnits', 'concernedUnitsCustom',
-      'dateSent', 'subjectFileUrl'];
+      'dateSent', 'dateSentMode', 'subjectFileUrl'];
     return (
       fields.some((f) => norm(editForm[f]) !== norm(editBaseline[f])) ||
       Boolean(editForm.remarksEmail) !== Boolean(editBaseline.remarksEmail) ||
@@ -254,12 +254,14 @@ export default function EditModal({
             </label>
 
             <label>
-              Date Sent
-              <input
-                type="date"
-                value={editForm.dateSent || ''}
-                onChange={(e) => handleEditFieldChange('dateSent', e.target.value)}
-              />
+              Date Sent Mode
+              <select
+                value={editForm.dateSentMode || 'DATE'}
+                onChange={(e) => handleEditFieldChange('dateSentMode', e.target.value)}
+              >
+                <option value="DATE">Date Picker</option>
+                <option value="TEXT">User Input</option>
+              </select>
             </label>
 
             {editForm.actionTaken === 'User Input' && (
@@ -273,6 +275,16 @@ export default function EditModal({
                 />
               </label>
             )}
+
+            <label className="modal__span">
+              Date Sent
+              <input
+                type={(editForm.dateSentMode || 'DATE') === 'DATE' ? 'date' : 'text'}
+                placeholder={(editForm.dateSentMode || 'DATE') === 'DATE' ? '' : 'Enter date sent'}
+                value={editForm.dateSent || ''}
+                onChange={(e) => handleEditFieldChange('dateSent', e.target.value)}
+              />
+            </label>
 
             <div className="modal__span form-panel__checkboxes form-panel__checkboxes--modal">
               <span>Remarks (Sent Through)</span>

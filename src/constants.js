@@ -91,6 +91,7 @@ export const INITIAL_RECORD = {
   remarksCustomText: '',
   concernedUnits: 'IND',
   concernedUnitsCustom: '',
+  dateSentMode: 'DATE',
   dateSent: '',
   status: 'Pending',
 };

@@ -234,7 +234,7 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
       }
       // ── End duplicate detection ──────────────────────────────────────────
 
-      const { subjectFile, fromCustom: _fcNew, concernedUnitsCustom: _cucNew, receivedByCustom: _rbcNew, actionTakenCustom: _atcNew, ...payload } = recordForm;
+      const { subjectFile, fromCustom: _fcNew, concernedUnitsCustom: _cucNew, receivedByCustom: _rbcNew, actionTakenCustom: _atcNew, dateSentMode: _dsmNew, ...payload } = recordForm;
       const resolvedFrom = recordForm.fromValue === 'User Input' ? recordForm.fromCustom : recordForm.fromValue;
       const resolvedConcernedUnits = recordForm.concernedUnits === 'User Input' ? recordForm.concernedUnitsCustom : recordForm.concernedUnits;
       const resolvedReceivedBy = recordForm.receivedBy === 'User Input' ? recordForm.receivedByCustom : recordForm.receivedBy;
@@ -284,6 +284,7 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
     const concernedInOpts = opts.filter((o) => o !== 'User Input').includes(row.concernedUnits);
     const actionInOpts = knownActions.includes(row.actionTaken);
     const isDatePattern = /^\d{4}-\d{2}-\d{2}$/.test(row.targetDate || '');
+    const isSentDatePattern = /^\d{4}-\d{2}-\d{2}$/.test(row.dateSent || '');
 
     const baseline = {
       ...row,
@@ -298,6 +299,7 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
       actionTaken: actionInOpts ? row.actionTaken : 'User Input',
       actionTakenCustom: actionInOpts ? '' : (row.actionTaken || ''),
       targetDateMode: isDatePattern ? 'DATE' : 'TEXT',
+      dateSentMode: row.dateSent ? (isSentDatePattern ? 'DATE' : 'TEXT') : 'DATE',
     };
     setEditForm(baseline);
     setEditBaseline(baseline);
@@ -330,7 +332,7 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
     setEditFormErrorMessage('');
     const apiFetch = makeApiFetch(authToken);
     try {
-      const { subjectFile, fromCustom: _fcEdit, actionTakenCustom: _atcEdit, receivedByCustom: _rbcEdit, concernedUnitsCustom: _cucEdit, targetDateMode: _tdmEdit, ...payload } = editForm;
+      const { subjectFile, fromCustom: _fcEdit, actionTakenCustom: _atcEdit, receivedByCustom: _rbcEdit, concernedUnitsCustom: _cucEdit, targetDateMode: _tdmEdit, dateSentMode: _dsmEdit, ...payload } = editForm;
       const resolvedEditFrom = editForm.fromValue === 'User Input' ? editForm.fromCustom : editForm.fromValue;
       const resolvedEditActionTaken = editForm.actionTaken === 'User Input' ? (editForm.actionTakenCustom || '') : editForm.actionTaken;
       const resolvedEditReceivedBy = editForm.receivedBy === 'User Input' ? (editForm.receivedByCustom || '') : editForm.receivedBy;
