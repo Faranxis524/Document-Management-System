@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import './App.css';
 
-import { SECTION_LABELS, MC_NAV_ITEMS } from './constants';
+import { SECTION_LABELS, MC_NAV_ITEMS, parseSections } from './constants';
 import { useToast } from './hooks/useToast';
 import { useAuth } from './hooks/useAuth';
 import { useRecords } from './hooks/useRecords';
@@ -92,8 +92,9 @@ function App() {
   // ── Nav items ──────────────────────────────────────────────────────────────
   const navItems = useMemo(() => {
     if (isMc) return MC_NAV_ITEMS;
-    const label = currentUser?.section ? SECTION_LABELS[currentUser.section] : null;
-    return label ? [label] : [];
+    const userSections = parseSections(currentUser?.section);
+    const labels = userSections.map((s) => SECTION_LABELS[s]).filter(Boolean);
+    return labels.length ? [...labels, 'Activity Log'] : [];
   }, [isMc, currentUser]);
 
   // ── Auth handlers ──────────────────────────────────────────────────────────

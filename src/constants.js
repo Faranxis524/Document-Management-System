@@ -111,3 +111,20 @@ const FROM_OPTIONS_EXTRA = [
 export function getFromOptions(section) {
   return [DEFAULT_FROM[section] || 'PFU', ...FROM_OPTIONS_EXTRA];
 }
+
+// Parse the section field (may be plain string or JSON array string like '["INVES","INTEL"]')
+export function parseSections(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  const t = String(value).trim();
+  if (t.startsWith('[')) {
+    try { return JSON.parse(t); } catch { return [t]; }
+  }
+  return t ? [t] : [];
+}
+
+// Serialize: single section stays as plain string; multiple become JSON array string
+export function serializeSections(arr) {
+  if (!arr || arr.length === 0) return null;
+  return arr.length === 1 ? arr[0] : JSON.stringify(arr);
+}

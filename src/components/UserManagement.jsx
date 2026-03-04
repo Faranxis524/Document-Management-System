@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { SECTIONS, SECTION_LABELS } from '../constants';
+import { SECTIONS, SECTION_LABELS, parseSections, serializeSections } from '../constants';
 
 const EMPTY_FORM = {
   username: '',
   password: '',
   role: 'SECTION',
-  section: 'INVES',
+  sections: ['INVES'],
   isActive: true,
 };
 
@@ -39,7 +39,7 @@ export default function UserManagement({
       username: user.username,
       password: '',
       role: user.role,
-      section: user.section || 'INVES',
+      sections: parseSections(user.section).length > 0 ? parseSections(user.section) : ['INVES'],
       isActive: user.isActive === 1 || user.isActive === true,
     });
     setFormError('');
@@ -61,13 +61,13 @@ export default function UserManagement({
           username: form.username.trim(),
           password: form.password,
           role: form.role,
-          section: form.role === 'SECTION' ? form.section : null,
+          section: form.role === 'SECTION' ? serializeSections(form.sections) : null,
         });
       } else {
         const fields = {
           username: form.username.trim(),
           role: form.role,
-          section: form.role === 'SECTION' ? form.section : null,
+          section: form.role === 'SECTION' ? serializeSections(form.sections) : null,
           isActive: form.isActive ? 1 : 0,
         };
         if (form.password) fields.password = form.password;
@@ -152,7 +152,9 @@ export default function UserManagement({
                         {user.role}
                       </span>
                     </td>
-                    <td>{user.section ? SECTION_LABELS[user.section] || user.section : <span style={{ color: '#aaa' }}>N/A</span>}</td>
+                    <td>{user.section
+                      ? parseSections(user.section).map(s => SECTION_LABELS[s] || s).join(', ')
+                      : <span style={{ color: '#aaa' }}>N/A</span>}</td>
                     <td>
                       <span className={`user-management__status user-management__status--${isActive ? 'active' : 'inactive'}`}>
                         {isActive ? 'Active' : 'Inactive'}
@@ -239,7 +241,7 @@ export default function UserManagement({
                       setForm((f) => ({
                         ...f,
                         role: e.target.value,
-                        section: e.target.value === 'MC' ? null : f.section || 'INVES',
+                        sections: e.target.value === 'MC' ? [] : (f.sections?.length ? f.sections : ['INVES']),
                       }))
                     }
                   >
@@ -250,17 +252,24 @@ export default function UserManagement({
 
                 {form.role === 'SECTION' && (
                   <label>
-                    Section
-                    <select
-                      value={form.section || 'INVES'}
-                      onChange={(e) => setForm((f) => ({ ...f, section: e.target.value }))}
-                    >
+                    Section(s)
+                    <div className="user-management__section-checks">
                       {SECTIONS.map((s) => (
-                        <option key={s} value={s}>
+                        <label key={s} className="user-management__section-check-label">
+                          <input
+                            type="checkbox"
+                            checked={form.sections.includes(s)}
+                            onChange={(e) => {
+                              const next = e.target.checked
+                                ? [...form.sections, s]
+                                : form.sections.filter((x) => x !== s);
+                              if (next.length > 0) setForm((f) => ({ ...f, sections: next }));
+                            }}
+                          />
                           {SECTION_LABELS[s]}
-                        </option>
+                        </label>
                       ))}
-                    </select>
+                    </div>
                   </label>
                 )}
 

@@ -482,18 +482,23 @@ async function createRecord(payload) {
 }
 
 async function listRecords(filters = {}) {
-  const { section } = filters;
+  const { section, sections } = filters;
+  // Normalise to an array (null = no section filter = return all)
+  const sectionList = sections || (section ? [section] : null);
+
   if (isSqlite) {
     const baseWhere = "mcCtrlNo IS NOT NULL AND TRIM(mcCtrlNo) <> '' AND sectionCtrlNo IS NOT NULL AND TRIM(sectionCtrlNo) <> '' AND section IS NOT NULL AND TRIM(section) <> ''";
-    if (section) {
-      return await allSqlite(`SELECT * FROM records WHERE ${baseWhere} AND section = ? ORDER BY dateReceived ASC;`, [section]);
+    if (sectionList) {
+      const ph = sectionList.map(() => '?').join(', ');
+      return await allSqlite(`SELECT * FROM records WHERE ${baseWhere} AND section IN (${ph}) ORDER BY dateReceived ASC;`, sectionList);
     }
     return await allSqlite(`SELECT * FROM records WHERE ${baseWhere} ORDER BY dateReceived ASC;`);
   }
-  if (section) {
+  if (sectionList) {
+    const ph = sectionList.map((_, i) => `$${i + 1}`).join(', ');
     const result = await pgPool.query(
-      "SELECT * FROM records WHERE mcCtrlNo IS NOT NULL AND BTRIM(mcCtrlNo) <> '' AND sectionCtrlNo IS NOT NULL AND BTRIM(sectionCtrlNo) <> '' AND section IS NOT NULL AND BTRIM(section) <> '' AND section = $1 ORDER BY dateReceived ASC;",
-      [section]
+      `SELECT * FROM records WHERE mcCtrlNo IS NOT NULL AND BTRIM(mcCtrlNo) <> '' AND sectionCtrlNo IS NOT NULL AND BTRIM(sectionCtrlNo) <> '' AND section IS NOT NULL AND BTRIM(section) <> '' AND section IN (${ph}) ORDER BY dateReceived ASC;`,
+      sectionList
     );
     return result.rows;
   }

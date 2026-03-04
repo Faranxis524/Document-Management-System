@@ -1,5 +1,5 @@
 import logo from '../assets/cidg-logo.svg';
-import { SECTION_LABELS } from '../constants';
+import { SECTION_LABELS, parseSections } from '../constants';
 
 export default function Sidebar({ navItems, activeSection, setActiveSection, isMc, currentUser, handleLogout }) {
   return (
@@ -19,9 +19,9 @@ export default function Sidebar({ navItems, activeSection, setActiveSection, isM
           const sectionKey = Object.keys(SECTION_LABELS).find((k) => SECTION_LABELS[k] === item);
           const allowed =
             (item === 'MC Master List' && isMc) ||
-            (item === 'Activity Log' && isMc) ||
+            (item === 'Activity Log') ||
             (item === 'User Management' && isMc) ||
-            (sectionKey && (isMc || currentUser?.section === sectionKey));
+            (sectionKey && (isMc || parseSections(currentUser?.section).includes(sectionKey)));
 
           return (
             <button
@@ -51,7 +51,7 @@ export default function Sidebar({ navItems, activeSection, setActiveSection, isM
         <div className="sidebar__profile-badges">
           <span className="sidebar__profile-badge">Role: {currentUser?.role}</span>
           {currentUser?.role !== 'MC' && (
-            <span className="sidebar__profile-badge">Section: {currentUser?.section}</span>
+            <span className="sidebar__profile-badge">Section: {parseSections(currentUser?.section).join(', ')}</span>
           )}
         </div>
       </div>

@@ -10,6 +10,7 @@ import {
   TABLE_COLUMNS,
   REPORT_SIGNATORIES,
   getFromOptions,
+  parseSections,
 } from '../constants';
 import { makeApiFetch, isUsableRecord, parseRemarksFlags, toDisplayDate } from '../utils';
 
@@ -259,7 +260,7 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
 
       setRecordForm((prev) => ({
         ...INITIAL_RECORD,
-        section: isMc ? prev.section : currentUser.section,
+        section: isMc ? prev.section : (parseSections(currentUser.section)[0] || prev.section),
         fromValue: DEFAULT_FROM[prev.section],
         concernedUnits: DEFAULT_FROM[prev.section],
       }));

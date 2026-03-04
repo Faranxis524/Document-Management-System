@@ -165,6 +165,7 @@ function authMiddleware(req, res, next) {
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
   try {
     req.user = jwt.verify(token, jwtSecret);
+    req.user.sections = parseSections(req.user.section);
     return next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid token' });
@@ -178,6 +179,23 @@ function requireRole(roles) {
     }
     return next();
   };
+}
+
+// Parse the section field from the DB/JWT — may be a plain string or a JSON array string
+function parseSections(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  const t = String(value).trim();
+  if (t.startsWith('[')) {
+    try { return JSON.parse(t); } catch { return [t]; }
+  }
+  return t ? [t] : [];
+}
+
+// Serialize sections: single section stays as plain string; multiple become JSON array
+function serializeSections(arr) {
+  if (!arr || arr.length === 0) return null;
+  return arr.length === 1 ? arr[0] : JSON.stringify(arr);
 }
 
 function validateInput(schema) {
@@ -407,7 +425,7 @@ app.post('/control-numbers/preview', authMiddleware, async (req, res) => {
   const { section, dateReceived } = req.body;
   if (!section) return res.status(400).json({ error: 'Section is required' });
   if (!dateReceived) return res.status(400).json({ error: 'Date received is required' });
-  if (req.user.role === 'SECTION' && req.user.section !== section) {
+  if (req.user.role === 'SECTION' && !req.user.sections.includes(section)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   const result = await getNextControlNumbers(section, dateReceived, true);
@@ -417,7 +435,7 @@ app.post('/control-numbers/preview', authMiddleware, async (req, res) => {
 app.post('/records', authMiddleware, async (req, res) => {
   const payload = sanitizeInput(req.body);
   
-  if (req.user.role === 'SECTION' && payload.section !== req.user.section) {
+  if (req.user.role === 'SECTION' && !req.user.sections.includes(payload.section)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   
@@ -478,7 +496,9 @@ app.get('/records', authMiddleware, async (req, res) => {
   const { section, page = '1', limit = '1000' } = req.query;
   const filters = {};
   if (req.user.role === 'SECTION') {
-    filters.section = req.user.section;
+    const userSections = req.user.sections;
+    if (userSections.length === 1) filters.section = userSections[0];
+    else if (userSections.length > 1) filters.sections = userSections;
   } else if (section && section !== 'ALL') {
     filters.section = section;
   }
@@ -518,7 +538,7 @@ app.get('/records/validate-control-numbers', authMiddleware, asyncHandler(async 
   }
   
   // Check permissions
-  if (req.user.role === 'SECTION' && req.user.section !== section) {
+  if (req.user.role === 'SECTION' && !req.user.sections.includes(section)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   
@@ -564,8 +584,8 @@ app.get('/records/check-duplicate', authMiddleware, asyncHandler(async (req, res
     return res.json({ hasDuplicates: false, matches: [] });
   }
 
-  // Section users can only check their own section
-  const resolvedSection = req.user.role === 'SECTION' ? req.user.section : (section || null);
+  // Section users can only check their own section(s)
+  const resolvedSection = req.user.role === 'SECTION' ? (req.user.sections[0] || req.user.section) : (section || null);
 
   const matches = await db.findDuplicates({
     subjectText: subjectText.trim(),
@@ -581,7 +601,7 @@ app.get('/records/check-duplicate', authMiddleware, asyncHandler(async (req, res
 app.get('/records/:id', authMiddleware, async (req, res) => {
   const record = await db.getRecord(req.params.id);
   if (!record) return res.status(404).json({ error: 'Not found' });
-  if (req.user.role === 'SECTION' && record.section !== req.user.section) {
+  if (req.user.role === 'SECTION' && !req.user.sections.includes(record.section)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   res.json(record);
@@ -591,7 +611,7 @@ app.put('/records/:id', authMiddleware, async (req, res) => {
   try {
     const record = await db.getRecord(req.params.id);
     if (!record) return res.status(404).json({ error: 'Not found' });
-    if (req.user.role === 'SECTION' && record.section !== req.user.section) {
+    if (req.user.role === 'SECTION' && !req.user.sections.includes(record.section)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
     
@@ -684,7 +704,7 @@ app.put('/records/:id', authMiddleware, async (req, res) => {
 app.delete('/records/:id', authMiddleware, asyncHandler(async (req, res) => {
   const record = await db.getRecord(req.params.id);
   if (!record) return res.status(404).json({ error: 'Not found' });
-  if (req.user.role === 'SECTION' && record.section !== req.user.section) {
+  if (req.user.role === 'SECTION' && !req.user.sections.includes(record.section)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   
@@ -743,7 +763,7 @@ app.delete('/records/:id', authMiddleware, asyncHandler(async (req, res) => {
 app.post('/records/:id/upload', authMiddleware, upload.single('file'), async (req, res) => {
   const record = await db.getRecord(req.params.id);
   if (!record) return res.status(404).json({ error: 'Not found' });
-  if (req.user.role === 'SECTION' && record.section !== req.user.section) {
+  if (req.user.role === 'SECTION' && !req.user.sections.includes(record.section)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
@@ -770,7 +790,7 @@ app.post('/records/:id/upload', authMiddleware, upload.single('file'), async (re
 app.get('/records/:id/file', authMiddleware, async (req, res) => {
   const record = await db.getRecord(req.params.id);
   if (!record) return res.status(404).json({ error: 'Not found' });
-  if (req.user.role === 'SECTION' && record.section !== req.user.section) {
+  if (req.user.role === 'SECTION' && !req.user.sections.includes(record.section)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   if (!record.subjectFileUrl) return res.status(404).json({ error: 'No file' });
@@ -794,7 +814,7 @@ app.get('/records/:id/file', authMiddleware, async (req, res) => {
 app.delete('/records/:id/file', authMiddleware, async (req, res) => {
   const record = await db.getRecord(req.params.id);
   if (!record) return res.status(404).json({ error: 'Not found' });
-  if (req.user.role === 'SECTION' && record.section !== req.user.section) {
+  if (req.user.role === 'SECTION' && !req.user.sections.includes(record.section)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   if (!record.subjectFileUrl) return res.status(404).json({ error: 'No file to remove' });
@@ -814,9 +834,15 @@ app.delete('/records/:id/file', authMiddleware, async (req, res) => {
 
 app.post('/export', authMiddleware, async (req, res) => {
   const { section } = req.body;
-  let filterSection = section;
-  if (req.user.role === 'SECTION') filterSection = req.user.section;
-  const records = await db.listRecords(filterSection ? { section: filterSection } : {});
+  let recordFilter = {};
+  if (req.user.role === 'SECTION') {
+    const us = req.user.sections;
+    if (us.length === 1) recordFilter = { section: us[0] };
+    else if (us.length > 1) recordFilter = { sections: us };
+  } else if (section) {
+    recordFilter = { section };
+  }
+  const records = await db.listRecords(recordFilter);
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Records');
@@ -852,7 +878,7 @@ app.post('/export', authMiddleware, async (req, res) => {
 app.get('/records/:id/audit-logs', authMiddleware, asyncHandler(async (req, res) => {
   const record = await db.getRecord(req.params.id);
   if (!record) return res.status(404).json({ error: 'Not found' });
-  if (req.user.role === 'SECTION' && record.section !== req.user.section) {
+  if (req.user.role === 'SECTION' && !req.user.sections.includes(record.section)) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   
@@ -860,10 +886,14 @@ app.get('/records/:id/audit-logs', authMiddleware, asyncHandler(async (req, res)
   res.json({ logs });
 }));
 
-// Get all audit logs (admin only)
-app.get('/audit-logs', authMiddleware, requireRole(['MC']), asyncHandler(async (req, res) => {
-  const { limit = '100', offset = '0' } = req.query;
+// Get all audit logs — MC sees all; SECTION users see only their section(s)
+app.get('/audit-logs', authMiddleware, asyncHandler(async (req, res) => {
+  const { limit = '500', offset = '0' } = req.query;
   const logs = await db.getAllAuditLogs(parseInt(limit, 10), parseInt(offset, 10));
+  if (req.user.role === 'SECTION') {
+    const userSections = req.user.sections;
+    return res.json({ logs: logs.filter(l => userSections.includes(l.section)) });
+  }
   res.json({ logs });
 }));
 
@@ -877,12 +907,108 @@ app.post('/audit-logs/clear', authMiddleware, requireRole(['MC']), asyncHandler(
   res.json({ ok: true, ...result });
 }));
 
+// ── CSV Import ───────────────────────────────────────────────────────────────
+// POST /import/csv  { csvContent: "<raw CSV text>", section: "INVES" }
+// MC role only. Skips rows whose mcCtrlNo already exists.
+app.post('/import/csv', authMiddleware, requireRole(['MC']), asyncHandler(async (req, res) => {
+  const { csvContent, section } = req.body || {};
+  if (!csvContent) return res.status(400).json({ error: 'csvContent is required' });
+  if (!section)    return res.status(400).json({ error: 'section is required' });
+
+  // Parse CSV helpers (same logic as import-inves.js)
+  function parseCSVLine(line) {
+    const result = []; let cur = ''; let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
+        else inQuotes = !inQuotes;
+      } else if (ch === ',' && !inQuotes) { result.push(cur.trim()); cur = ''; }
+      else cur += ch;
+    }
+    result.push(cur.trim());
+    return result;
+  }
+
+  const raw = csvContent.replace(/^\uFEFF/, '');
+  const lines = raw.split(/\r?\n/).filter(l => l.trim());
+  const sectionUpper = section.toUpperCase();
+
+  // Collect rows matching the requested section
+  const rows = lines
+    .map(l => parseCSVLine(l))
+    .filter(cols => cols.length > 2 && cols[2].trim().toUpperCase() === sectionUpper);
+
+  // Get existing ctrl nos to skip duplicates
+  const existing = await db.listRecords({ section });
+  const existingSet = new Set(existing.map(r => r.mcCtrlNo).filter(Boolean));
+
+  const inserted = []; const skipped = []; const errors = [];
+
+  for (const cols of rows) {
+    const mcCtrlNo       = cols[0]  || '';
+    const sectionCtrlNo  = cols[1]  || '';
+    const sec            = cols[2]  || section;
+    const dateReceived   = cols[3]  || '';
+    const subjectText    = cols[4]  || '';
+    const fromValue      = cols[5]  || '';
+    const targetDate     = cols[6]  || '';
+    const receivedBy     = cols[7]  || '';
+    const actionTaken    = cols[8]  || '';
+    const remarks        = cols[9]  || '';
+    const concernedUnits = cols[10] || '';
+    const dateSent       = cols[11] || '';
+
+    if (!mcCtrlNo) { skipped.push(`(blank mcCtrlNo) ${subjectText.slice(0, 60)}`); continue; }
+    if (existingSet.has(mcCtrlNo)) { skipped.push(`${mcCtrlNo} (already exists)`); continue; }
+
+    try {
+      const record = await db.createRecord({
+        mcCtrlNo, sectionCtrlNo, section: sec,
+        dateReceived, subjectText, subjectFileUrl: null,
+        fromValue, fromType: 'USER',
+        targetDate, targetDateMode: 'DATE',
+        receivedBy, actionTaken,
+        remarks, concernedUnits, dateSent,
+        createdBy: req.user.username, updatedBy: req.user.username,
+      });
+      await db.createAuditLog({
+        recordId: record.id, action: 'CREATE', fieldName: null,
+        oldValue: null, newValue: JSON.stringify(record),
+        section: record.section, sectionCtrlNo: record.sectionCtrlNo, mcCtrlNo: record.mcCtrlNo,
+        performedBy: req.user.username, ipAddress: req.ip, userAgent: req.get('user-agent'),
+      });
+      existingSet.add(mcCtrlNo);
+      inserted.push(mcCtrlNo);
+    } catch (err) {
+      errors.push(`${mcCtrlNo}: ${err.message}`);
+    }
+  }
+
+  res.json({
+    ok: true,
+    total: rows.length,
+    inserted: inserted.length,
+    skipped: skipped.length,
+    errors: errors.length,
+    insertedList: inserted,
+    skippedList: skipped,
+    errorList: errors,
+  });
+}));
+
 // Export to CSV
 app.post('/export/csv', authMiddleware, asyncHandler(async (req, res) => {
   const { section } = req.body;
-  let filterSection = section;
-  if (req.user.role === 'SECTION') filterSection = req.user.section;
-  const records = await db.listRecords(filterSection ? { section: filterSection } : {});
+  let recordFilter = {};
+  if (req.user.role === 'SECTION') {
+    const us = req.user.sections;
+    if (us.length === 1) recordFilter = { section: us[0] };
+    else if (us.length > 1) recordFilter = { sections: us };
+  } else if (section) {
+    recordFilter = { section };
+  }
+  const records = await db.listRecords(recordFilter);
 
   const headers = [
     'MC Ctrl No.', 'Section Ctrl No.', 'Section', 'Date Received', 'Subject',
