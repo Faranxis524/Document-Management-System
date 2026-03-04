@@ -240,13 +240,7 @@ function validateDates(payload) {
     errors.push('Date received must be in YYYY-MM-DD format');
   }
   
-  if (targetDate && !/^\d{4}-\d{2}-\d{2}$/.test(targetDate) && targetDate !== '') {
-    // Allow empty or valid date format
-    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
-    if (!datePattern.test(targetDate)) {
-      errors.push('Target date must be in YYYY-MM-DD format or a text description');
-    }
-  }
+  // Non-date strings (e.g. 'daily', 'N/A', 'after 3 days') are allowed as text descriptions — no validation needed
   
   if (dateSent && !/^\d{4}-\d{2}-\d{2}$/.test(dateSent) && dateSent !== '') {
     errors.push('Date sent must be in YYYY-MM-DD format');
@@ -275,6 +269,11 @@ function validateDates(payload) {
 }
 
 function normalizeRemarks(payload) {
+  // If "Others" is selected, store only the raw custom text (no "sent through" prefix)
+  if (payload.remarksCustom && payload.remarksCustomText && String(payload.remarksCustomText).trim()) {
+    return String(payload.remarksCustomText).trim();
+  }
+
   const selected = [];
   if (payload.remarksEmail) selected.push('email');
   if (payload.remarksViber) selected.push('viber');

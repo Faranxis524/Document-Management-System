@@ -40,14 +40,22 @@ export function toIsoDate(displayDate) {
 // ─── Remarks helpers ──────────────────────────────────────────────────────────
 
 export function parseRemarksFlags(remarksText) {
-  const raw = String(remarksText || '').toLowerCase();
-  const content = raw.replace(/^\s*sent through\s*/, '');
-  const tokens = content.split('/').map((p) => p.trim()).filter(Boolean);
-  const has = (v) => tokens.includes(v);
+  const raw = String(remarksText || '').trim();
+  if (!raw) return { remarksEmail: false, remarksViber: false, remarksHardCopy: false, remarksCustom: false, remarksCustomText: '' };
+
+  // If it does NOT start with "sent through", treat the whole value as a custom (Others) entry
+  if (!raw.toLowerCase().startsWith('sent through')) {
+    return { remarksEmail: false, remarksViber: false, remarksHardCopy: false, remarksCustom: true, remarksCustomText: raw };
+  }
+
+  const content = raw.replace(/^\s*sent through\s*/i, '');
+  const tokens = content.split('/').map((p) => p.trim().toLowerCase()).filter(Boolean);
   return {
-    remarksEmail: has('email'),
-    remarksViber: has('viber'),
-    remarksHardCopy: has('hardcopy') || has('hard copy'),
+    remarksEmail: tokens.includes('email'),
+    remarksViber: tokens.includes('viber'),
+    remarksHardCopy: tokens.includes('hardcopy') || tokens.includes('hard copy'),
+    remarksCustom: false,
+    remarksCustomText: '',
   };
 }
 

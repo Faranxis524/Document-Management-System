@@ -14,12 +14,13 @@ export default function RecordForm({
   isSaving,
 }) {
   const remarksText = useMemo(() => {
+    if (recordForm.remarksCustom) return recordForm.remarksCustomText || '';
     const parts = [];
     if (recordForm.remarksEmail) parts.push('email');
     if (recordForm.remarksViber) parts.push('viber');
     if (recordForm.remarksHardCopy) parts.push('hardcopy');
     return parts.length ? `sent through ${parts.join('/ ')}` : '';
-  }, [recordForm.remarksEmail, recordForm.remarksViber, recordForm.remarksHardCopy]);
+  }, [recordForm.remarksEmail, recordForm.remarksViber, recordForm.remarksHardCopy, recordForm.remarksCustom, recordForm.remarksCustomText]);
 
   const getFieldClass = (field) => (formErrors[field] ? 'input--error' : '');
 
@@ -201,8 +202,21 @@ export default function RecordForm({
               {(RECEIVED_BY[recordForm.section] || []).map((p) => (
                 <option key={p} value={p}>{p}</option>
               ))}
+              <option value="User Input">User Input</option>
             </select>
           </label>
+
+          {recordForm.receivedBy === 'User Input' && (
+            <label>
+              Received By (Custom)
+              <input
+                type="text"
+                placeholder="Enter name"
+                value={recordForm.receivedByCustom}
+                onChange={(e) => setRecordForm((prev) => ({ ...prev, receivedByCustom: e.target.value }))}
+              />
+            </label>
+          )}
         </div>
 
         {/* ── Group 3: Disposition ─────────────────────── */}
@@ -218,8 +232,21 @@ export default function RecordForm({
               <option value="DRAFTED">Drafted</option>
               <option value="DISSEMINATED">Disseminated</option>
               <option value="FILED">Filed</option>
+              <option value="User Input">User Input</option>
             </select>
           </label>
+
+          {recordForm.actionTaken === 'User Input' && (
+            <label>
+              Action Taken (Custom)
+              <input
+                type="text"
+                placeholder="Enter action taken"
+                value={recordForm.actionTakenCustom}
+                onChange={(e) => setRecordForm((prev) => ({ ...prev, actionTakenCustom: e.target.value }))}
+              />
+            </label>
+          )}
 
           <div className="form-panel__checkboxes">
             <span>Remarks (Sent Through)</span>
@@ -232,11 +259,36 @@ export default function RecordForm({
                 <input
                   type="checkbox"
                   checked={recordForm[key]}
+                  disabled={recordForm.remarksCustom}
                   onChange={(e) => setRecordForm((prev) => ({ ...prev, [key]: e.target.checked }))}
                 />
                 {label}
               </label>
             ))}
+            <label>
+              <input
+                type="checkbox"
+                checked={recordForm.remarksCustom}
+                onChange={(e) => setRecordForm((prev) => ({
+                  ...prev,
+                  remarksCustom: e.target.checked,
+                  remarksCustomText: e.target.checked ? prev.remarksCustomText : '',
+                  remarksEmail: false,
+                  remarksViber: false,
+                  remarksHardCopy: false,
+                }))}
+              />
+              Others
+            </label>
+            {recordForm.remarksCustom && (
+              <input
+                type="text"
+                placeholder="Enter custom remark"
+                value={recordForm.remarksCustomText}
+                onChange={(e) => setRecordForm((prev) => ({ ...prev, remarksCustomText: e.target.value }))}
+                style={{ marginTop: '4px' }}
+              />
+            )}
             <div className="form-panel__remarks">Output: {remarksText || '-'}</div>
           </div>
 
@@ -252,6 +304,18 @@ export default function RecordForm({
               {fromOpts.map((o) => <option key={o} value={o}>{o}</option>)}
             </select>
           </label>
+
+          {recordForm.concernedUnits === 'User Input' && (
+            <label>
+              Concerned Units (Custom)
+              <input
+                type="text"
+                placeholder="Enter concerned units"
+                value={recordForm.concernedUnitsCustom}
+                onChange={(e) => setRecordForm((prev) => ({ ...prev, concernedUnitsCustom: e.target.value }))}
+              />
+            </label>
+          )}
 
           <label>
             Date Sent

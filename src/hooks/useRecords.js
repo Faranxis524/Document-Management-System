@@ -9,6 +9,7 @@ import {
   RECEIVED_BY,
   TABLE_COLUMNS,
   REPORT_SIGNATORIES,
+  getFromOptions,
 } from '../constants';
 import { makeApiFetch, isUsableRecord, parseRemarksFlags, toDisplayDate } from '../utils';
 
@@ -173,6 +174,7 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
         fromValue: prev.section !== section ? DEFAULT_FROM[section] : prev.fromValue,
         fromCustom: prev.section !== section ? '' : prev.fromCustom,
         concernedUnits: prev.section !== section ? DEFAULT_FROM[section] : prev.concernedUnits,
+        concernedUnitsCustom: prev.section !== section ? '' : prev.concernedUnitsCustom,
         receivedBy: prev.section !== section ? (RECEIVED_BY[section]?.[0] || '') : prev.receivedBy,
       }));
       setFormErrors((prev) => {
@@ -194,7 +196,10 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
     if (recordForm.fromValue === 'User Input' && !recordForm.fromCustom) errors.fromValue = 'Please enter a custom from value.';
     if (!recordForm.targetDate) errors.targetDate = 'Target date is required.';
     if (!recordForm.receivedBy) errors.receivedBy = 'Received by is required.';
+    if (recordForm.receivedBy === 'User Input' && !recordForm.receivedByCustom) errors.receivedBy = 'Please enter a name for received by.';
+    if (recordForm.actionTaken === 'User Input' && !recordForm.actionTakenCustom) errors.actionTaken = 'Please enter a custom action taken value.';
     if (!recordForm.concernedUnits) errors.concernedUnits = 'Concerned unit is required.';
+    if (recordForm.concernedUnits === 'User Input' && !recordForm.concernedUnitsCustom) errors.concernedUnits = 'Please enter a custom concerned unit value.';
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       setFormErrorMessage('Please complete the required fields highlighted in red.');
@@ -229,11 +234,14 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
       }
       // ── End duplicate detection ──────────────────────────────────────────
 
-      const { subjectFile, fromCustom: _fcNew, ...payload } = recordForm;
+      const { subjectFile, fromCustom: _fcNew, concernedUnitsCustom: _cucNew, receivedByCustom: _rbcNew, actionTakenCustom: _atcNew, ...payload } = recordForm;
       const resolvedFrom = recordForm.fromValue === 'User Input' ? recordForm.fromCustom : recordForm.fromValue;
+      const resolvedConcernedUnits = recordForm.concernedUnits === 'User Input' ? recordForm.concernedUnitsCustom : recordForm.concernedUnits;
+      const resolvedReceivedBy = recordForm.receivedBy === 'User Input' ? recordForm.receivedByCustom : recordForm.receivedBy;
+      const resolvedActionTaken = recordForm.actionTaken === 'User Input' ? recordForm.actionTakenCustom : recordForm.actionTaken;
       const created = await apiFetch('/records', {
         method: 'POST',
-        body: JSON.stringify({ ...payload, fromValue: resolvedFrom, createdBy: currentUser.username }),
+        body: JSON.stringify({ ...payload, fromValue: resolvedFrom, concernedUnits: resolvedConcernedUnits, receivedBy: resolvedReceivedBy, actionTaken: resolvedActionTaken, createdBy: currentUser.username }),
       });
       setRecords((prev) => sortRecords([...prev, created]));
       showToast('success', 'Record Saved', `${created.mcCtrlNo} was created`);
@@ -268,7 +276,29 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
   // ── Open edit modal ────────────────────────────────────────────────────────
   const handleOpenEdit = (row) => {
     const flags = parseRemarksFlags(row.remarksText || row.remarks);
-    const baseline = { ...row, ...flags, subjectFile: null };
+    const opts = getFromOptions(row.section);
+    const knownActions = ['DRAFTED', 'DISSEMINATED', 'FILED'];
+
+    const fromInOpts = opts.filter((o) => o !== 'User Input').includes(row.fromValue);
+    const receivedInOpts = (RECEIVED_BY[row.section] || []).includes(row.receivedBy);
+    const concernedInOpts = opts.filter((o) => o !== 'User Input').includes(row.concernedUnits);
+    const actionInOpts = knownActions.includes(row.actionTaken);
+    const isDatePattern = /^\d{4}-\d{2}-\d{2}$/.test(row.targetDate || '');
+
+    const baseline = {
+      ...row,
+      ...flags,
+      subjectFile: null,
+      fromValue: fromInOpts ? row.fromValue : 'User Input',
+      fromCustom: fromInOpts ? '' : (row.fromValue || ''),
+      receivedBy: receivedInOpts ? row.receivedBy : 'User Input',
+      receivedByCustom: receivedInOpts ? '' : (row.receivedBy || ''),
+      concernedUnits: concernedInOpts ? row.concernedUnits : 'User Input',
+      concernedUnitsCustom: concernedInOpts ? '' : (row.concernedUnits || ''),
+      actionTaken: actionInOpts ? row.actionTaken : 'User Input',
+      actionTakenCustom: actionInOpts ? '' : (row.actionTaken || ''),
+      targetDateMode: isDatePattern ? 'DATE' : 'TEXT',
+    };
     setEditForm(baseline);
     setEditBaseline(baseline);
     setEditFormErrors({});
@@ -286,7 +316,10 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
     if (editForm.fromValue === 'User Input' && !editForm.fromCustom) errors.fromValue = 'Please enter a custom from value.';
     if (!editForm.targetDate) errors.targetDate = 'Target date is required.';
     if (!editForm.receivedBy) errors.receivedBy = 'Received by is required.';
+    if (editForm.receivedBy === 'User Input' && !editForm.receivedByCustom) errors.receivedBy = 'Please enter a name for received by.';
+    if (editForm.actionTaken === 'User Input' && !editForm.actionTakenCustom) errors.actionTaken = 'Please enter a custom action taken value.';
     if (!editForm.concernedUnits) errors.concernedUnits = 'Concerned unit is required.';
+    if (editForm.concernedUnits === 'User Input' && !editForm.concernedUnitsCustom) errors.concernedUnits = 'Please enter a custom concerned unit value.';
     if (Object.keys(errors).length > 0) {
       setEditFormErrors(errors);
       setEditFormErrorMessage('Please complete the required edit fields highlighted in red.');
@@ -297,11 +330,14 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
     setEditFormErrorMessage('');
     const apiFetch = makeApiFetch(authToken);
     try {
-      const { subjectFile, fromCustom: _fcEdit, ...payload } = editForm;
+      const { subjectFile, fromCustom: _fcEdit, actionTakenCustom: _atcEdit, receivedByCustom: _rbcEdit, concernedUnitsCustom: _cucEdit, targetDateMode: _tdmEdit, ...payload } = editForm;
       const resolvedEditFrom = editForm.fromValue === 'User Input' ? editForm.fromCustom : editForm.fromValue;
+      const resolvedEditActionTaken = editForm.actionTaken === 'User Input' ? (editForm.actionTakenCustom || '') : editForm.actionTaken;
+      const resolvedEditReceivedBy = editForm.receivedBy === 'User Input' ? (editForm.receivedByCustom || '') : editForm.receivedBy;
+      const resolvedEditConcernedUnits = editForm.concernedUnits === 'User Input' ? (editForm.concernedUnitsCustom || '') : editForm.concernedUnits;
       const updated = await apiFetch(`/records/${editModal.recordId}`, {
         method: 'PUT',
-        body: JSON.stringify({ ...payload, fromValue: resolvedEditFrom, updatedBy: currentUser.username, version: editForm.version }),
+        body: JSON.stringify({ ...payload, fromValue: resolvedEditFrom, actionTaken: resolvedEditActionTaken, receivedBy: resolvedEditReceivedBy, concernedUnits: resolvedEditConcernedUnits, updatedBy: currentUser.username, version: editForm.version }),
       });
       setRecords((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
 
@@ -327,10 +363,7 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
         if (ok) {
           try {
             const fresh = await apiFetch(`/records/${editModal.recordId}`);
-            const flags = parseRemarksFlags(fresh.remarksText || fresh.remarks);
-            const baseline = { ...fresh, ...flags, subjectFile: null };
-            setEditForm(baseline);
-            setEditBaseline(baseline);
+            handleOpenEdit(fresh);
             showToast('info', 'Record Refreshed', 'Please review and save again.');
           } catch (refreshErr) {
             showToast('error', 'Refresh Failed', refreshErr.message);
