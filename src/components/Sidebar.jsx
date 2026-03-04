@@ -8,8 +8,10 @@ export default function Sidebar({ navItems, activeSection, setActiveSection, isM
         <div className="seal-wrap">
           <img className="sidebar__seal" src={logo} alt="CIDG RFU 4A Seal" />
         </div>
-        <h2>CIDG RFU 4A</h2>
-        <span>Document Management System</span>
+        <div>
+          <h2>CIDG RFU 4A</h2>
+          <span>Document Management System</span>
+        </div>
       </div>
 
       <nav className="sidebar__nav">
@@ -45,10 +47,13 @@ export default function Sidebar({ navItems, activeSection, setActiveSection, isM
       </nav>
 
       <div className="sidebar__profile">
-        <h4>Active Profile</h4>
-        <p><strong>Name:</strong> {currentUser?.username}</p>
-        <p><strong>Role:</strong> {currentUser?.role}</p>
-        <p><strong>Section:</strong> {currentUser?.section || 'MC'}</p>
+        <span className="sidebar__profile-name">{currentUser?.username}</span>
+        <div className="sidebar__profile-badges">
+          <span className="sidebar__profile-badge">Role: {currentUser?.role}</span>
+          {currentUser?.role !== 'MC' && (
+            <span className="sidebar__profile-badge">Section: {currentUser?.section}</span>
+          )}
+        </div>
       </div>
     </aside>
   );

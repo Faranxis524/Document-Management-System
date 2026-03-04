@@ -18,7 +18,7 @@ export default function ActivityLog({
               <tr>
                 <th>Timestamp</th>
                 <th>Section</th>
-                <th>Section Ctrl No.</th>
+                <th>Ctrl No.</th>
                 <th>Action</th>
                 <th>Details</th>
                 <th>User</th>

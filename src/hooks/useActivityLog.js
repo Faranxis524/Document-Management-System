@@ -48,8 +48,10 @@ export function getLogSection(log) {
 
 export function getLogSectionCtrlNo(log) {
   if (log?.sectionCtrlNo) return toSingleLine(log.sectionCtrlNo);
+  if (log?.mcCtrlNo) return toSingleLine(log.mcCtrlNo);
   if (log?.fieldName === 'sectionCtrlNo') return toSingleLine(log?.newValue) || toSingleLine(log?.oldValue) || '';
-  return getRecordSnapshotFromLog(log)?.sectionCtrlNo || '';
+  const snap = getRecordSnapshotFromLog(log);
+  return snap?.sectionCtrlNo || snap?.mcCtrlNo || '';
 }
 
 export function getLogDetails(log) {
@@ -60,9 +62,11 @@ export function getLogDetails(log) {
   const ctrlNoPart = [mcCtrlNo, sectionCtrlNo].filter(Boolean).join(' / ');
 
   if (action === 'UPDATE' && log?.fieldName) {
+    const ctrlNo = toSingleLine(log?.sectionCtrlNo || log?.mcCtrlNo || '');
     const old = toSingleLine(log?.oldValue) || '(empty)';
     const nv = toSingleLine(log?.newValue) || '(empty)';
-    return `Updated ${log.fieldName} from "${old}" to "${nv}"`;
+    const prefix = ctrlNo ? `[${ctrlNo}] ` : '';
+    return `${prefix}Updated ${log.fieldName} from "${old}" to "${nv}"`;
   }
   if (action === 'CREATE') return ctrlNoPart ? `Created record ${ctrlNoPart}` : 'Created record';
   if (action === 'DELETE') return ctrlNoPart ? `Deleted record ${ctrlNoPart}` : 'Deleted record';
