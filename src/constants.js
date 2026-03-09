@@ -71,6 +71,12 @@ export const MC_NAV_ITEMS = [
   'User Management',
 ];
 
+export const VIEWER_NAV_ITEMS = [
+  'MC Master List',
+  ...SECTIONS.map((s) => SECTION_LABELS[s]),
+  'Activity Log',
+];
+
 export const INITIAL_RECORD = {
   mcCtrlNo: '',
   sectionCtrlNo: '',

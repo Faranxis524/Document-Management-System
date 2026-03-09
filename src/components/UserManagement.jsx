@@ -241,16 +241,17 @@ export default function UserManagement({
                       setForm((f) => ({
                         ...f,
                         role: e.target.value,
-                        sections: e.target.value === 'MC' ? [] : (f.sections?.length ? f.sections : ['INVES']),
+                        sections: (e.target.value === 'MC' || e.target.value === 'VIEWER') ? [] : (f.sections?.length ? f.sections : ['INVES']),
                       }))
                     }
                   >
                     <option value="MC">MC (Master Control)</option>
                     <option value="SECTION">SECTION</option>
+                    <option value="VIEWER">VIEWER (Read-only)</option>
                   </select>
                 </label>
 
-                {form.role === 'SECTION' && (
+                {form.role === 'SECTION' && form.role !== 'VIEWER' && (
                   <label>
                     Section(s)
                     <div className="user-management__section-checks">

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import './App.css';
 
-import { SECTION_LABELS, MC_NAV_ITEMS, DEFAULT_FROM, RECEIVED_BY, parseSections } from './constants';
+import { SECTION_LABELS, MC_NAV_ITEMS, VIEWER_NAV_ITEMS, DEFAULT_FROM, RECEIVED_BY, parseSections } from './constants';
 import { useToast } from './hooks/useToast';
 import { useAuth } from './hooks/useAuth';
 import { useRecords } from './hooks/useRecords';
@@ -66,6 +66,8 @@ function App() {
     logout,
   } = useAuth();
 
+  const isViewer = currentUser?.role === 'VIEWER';
+
   const {
     records,
     isSaving,
@@ -101,6 +103,7 @@ function App() {
     filterYear, setFilterYear,
     dateFrom, setDateFrom,
     dateTo, setDateTo,
+    sortOrder, setSortOrder,
     clearFilters,
     isFiltered,
     displayRecords,
@@ -117,10 +120,11 @@ function App() {
   // ── Nav items ──────────────────────────────────────────────────────────────
   const navItems = useMemo(() => {
     if (isMc) return MC_NAV_ITEMS;
+    if (isViewer) return VIEWER_NAV_ITEMS;
     const userSections = parseSections(currentUser?.section);
     const labels = userSections.map((s) => SECTION_LABELS[s]).filter(Boolean);
     return labels.length ? [...labels, 'Activity Log'] : [];
-  }, [isMc, currentUser]);
+  }, [isMc, isViewer, currentUser]);
 
   // Apply form defaults once when a SECTION user session is restored from localStorage
   useEffect(() => {
@@ -190,6 +194,7 @@ function App() {
             <Toolbar
               activeSection={activeSection}
               isMc={isMc}
+              isViewer={isViewer}
               apiError={apiError}
               search={search} setSearch={setSearch}
               filterSection={filterSection} setFilterSection={setFilterSection}
@@ -202,6 +207,8 @@ function App() {
               dateTo={dateTo} setDateTo={setDateTo}
               isFiltered={isFiltered}
               clearFilters={clearFilters}
+              sortOrder={sortOrder}
+              setSortOrder={setSortOrder}
               records={records}
               displayRecords={displayRecords}
               filterMonthForPdf={filterMonth}
@@ -284,6 +291,7 @@ function App() {
 
       <EditModal
         isMc={isMc}
+        isViewer={isViewer}
         editModal={editModal}
         setEditModal={setEditModal}
         editForm={editForm}

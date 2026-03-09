@@ -10,6 +10,7 @@ const MONTH_NAMES = [
 export default function Toolbar({
   activeSection,
   isMc,
+  isViewer,
   apiError,
   // search / filter state
   search, setSearch,
@@ -21,6 +22,7 @@ export default function Toolbar({
   dateFrom, setDateFrom,
   dateTo, setDateTo,
   isFiltered, clearFilters,
+  sortOrder, setSortOrder,
   // all (unfiltered) records — used to build the year dropdown
   records,
   // export handlers (receive displayRecords for PDF)
@@ -163,6 +165,16 @@ export default function Toolbar({
           ))}
         </select>
 
+        <select
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value)}
+          className={sortOrder !== 'asc' ? 'filter-active' : ''}
+          title="Sort order by MC Ctrl No."
+        >
+          <option value="asc">↑ Ascending</option>
+          <option value="desc">↓ Descending</option>
+        </select>
+
         <div className="toolbar__date">
           <label className="toolbar__date-label">
             From
@@ -193,9 +205,11 @@ export default function Toolbar({
 
       {/* Row 2 — Exports + Refresh */}
       <div className="toolbar__row toolbar__row--actions">
-        <button type="button" className="toolbar__new-record" onClick={onNewRecord}>
-          + New Record
-        </button>
+        {!isViewer && (
+          <button type="button" className="toolbar__new-record" onClick={onNewRecord}>
+            + New Record
+          </button>
+        )}
         <button type="button" className="toolbar__refresh" onClick={() => refreshRecords(true)} disabled={isLoadingRecords}>
           {isLoadingRecords ? 'Refreshing…' : 'Refresh'}
         </button>

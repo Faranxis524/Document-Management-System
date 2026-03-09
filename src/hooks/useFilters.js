@@ -58,6 +58,7 @@ export function useFilters({ records, currentUser, isMc, activeSection }) {
   const [filterYear, setFilterYear] = useState(() => localStorage.getItem('dms_filterYear') || '');
   const [dateFrom, setDateFrom] = useState(() => localStorage.getItem('dms_dateFrom') || '');
   const [dateTo, setDateTo] = useState(() => localStorage.getItem('dms_dateTo') || '');
+  const [sortOrder, setSortOrder] = useState(() => localStorage.getItem('dms_sortOrder') || 'asc');
 
   // Persist filters to localStorage
   useEffect(() => { localStorage.setItem('dms_search', search); }, [search]);
@@ -68,6 +69,7 @@ export function useFilters({ records, currentUser, isMc, activeSection }) {
   useEffect(() => { localStorage.setItem('dms_filterYear', filterYear); }, [filterYear]);
   useEffect(() => { localStorage.setItem('dms_dateFrom', dateFrom); }, [dateFrom]);
   useEffect(() => { localStorage.setItem('dms_dateTo', dateTo); }, [dateTo]);
+  useEffect(() => { localStorage.setItem('dms_sortOrder', sortOrder); }, [sortOrder]);
 
   const clearFilters = () => {
     setFilterAction('ALL');
@@ -77,17 +79,19 @@ export function useFilters({ records, currentUser, isMc, activeSection }) {
     setFilterYear('');
     setDateFrom('');
     setDateTo('');
+    setSortOrder('asc');
   };
 
-  const isFiltered = filterAction !== 'ALL' || filterSection !== 'ALL' || filterStatus !== 'ALL' || filterMonth || filterYear || dateFrom || dateTo;
+  const isFiltered = filterAction !== 'ALL' || filterSection !== 'ALL' || filterStatus !== 'ALL' || filterMonth || filterYear || dateFrom || dateTo || sortOrder !== 'asc';
 
   const displayRecords = useMemo(() => {
     const activeSectionKey = Object.keys(SECTION_LABELS).find(
       (key) => SECTION_LABELS[key] === activeSection
     );
 
-    return records.filter((row) => {
-      if (!isMc && row.section !== currentUser?.section) return false;
+    const filtered = records.filter((row) => {
+      const isViewer = currentUser?.role === 'VIEWER';
+      if (!isMc && !isViewer && row.section !== currentUser?.section) return false;
       if (activeSection !== 'MC Master List' && activeSectionKey && row.section !== activeSectionKey) return false;
       if (activeSection === 'MC Master List' && filterSection !== 'ALL' && row.section !== filterSection) return false;
       if (filterAction !== 'ALL' && row.actionTaken !== filterAction) return false;
@@ -102,8 +106,18 @@ export function useFilters({ records, currentUser, isMc, activeSection }) {
       if (!matchesSearch(row, search)) return false;
       return true;
     });
-  }, [records, isMc, currentUser, filterSection, filterAction, filterStatus, filterMonth, filterYear, dateFrom, dateTo, search, activeSection]);
 
+    // Sort by MC Ctrl No. — lexicographic works because numbers are zero-padded
+    filtered.sort((a, b) => {
+      const ca = (a.mcCtrlNo || '').toLowerCase();
+      const cb = (b.mcCtrlNo || '').toLowerCase();
+      if (ca < cb) return sortOrder === 'asc' ? -1 : 1;
+      if (ca > cb) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return filtered;
+  }, [records, isMc, currentUser, filterSection, filterAction, filterStatus, filterMonth, filterYear, dateFrom, dateTo, search, activeSection, sortOrder]);
   return {
     search, setSearch,
     filterSection, setFilterSection,
@@ -113,6 +127,7 @@ export function useFilters({ records, currentUser, isMc, activeSection }) {
     filterYear, setFilterYear,
     dateFrom, setDateFrom,
     dateTo, setDateTo,
+    sortOrder, setSortOrder,
     clearFilters,
     isFiltered,
     displayRecords,

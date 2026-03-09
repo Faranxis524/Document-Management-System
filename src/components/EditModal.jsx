@@ -4,6 +4,7 @@ import { getRecordFileHref } from '../utils';
 
 export default function EditModal({
   isMc,
+  isViewer,
   editModal, setEditModal,
   editForm,
   editBaseline, setEditBaseline,
@@ -359,7 +360,7 @@ export default function EditModal({
 
         <div className="modal__actions modal__actions--spread">
           <div style={{ display: 'flex', gap: '10px' }}>
-            {!confirmDelete ? (
+            {!isViewer && (!confirmDelete ? (
               <button
                 type="button"
                 className="danger"
@@ -388,19 +389,21 @@ export default function EditModal({
                   Cancel
                 </button>
               </div>
-            )}
+            ))}
           </div>
           <div className="modal__actions">
             <button type="button" className="secondary" onClick={closeModal}>
-              Cancel
+              {isViewer ? 'Close' : 'Cancel'}
             </button>
-            <button
-              type="button"
-              onClick={handleUpdateRecord}
-              disabled={isSaving || !isEditDirty}
-            >
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </button>
+            {!isViewer && (
+              <button
+                type="button"
+                onClick={handleUpdateRecord}
+                disabled={isSaving || !isEditDirty}
+              >
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            )}
           </div>
         </div>
       </div>

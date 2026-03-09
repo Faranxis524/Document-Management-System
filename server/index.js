@@ -181,6 +181,14 @@ function requireRole(roles) {
   };
 }
 
+/** Block VIEWER role from any write operation */
+function denyViewer(req, res, next) {
+  if (req.user?.role === 'VIEWER') {
+    return res.status(403).json({ error: 'Viewers cannot modify records' });
+  }
+  return next();
+}
+
 // Parse the section field from the DB/JWT — may be a plain string or a JSON array string
 function parseSections(value) {
   if (!value) return [];
@@ -432,7 +440,7 @@ app.post('/control-numbers/preview', authMiddleware, async (req, res) => {
   res.json(result);
 });
 
-app.post('/records', authMiddleware, async (req, res) => {
+app.post('/records', authMiddleware, denyViewer, async (req, res) => {
   const payload = sanitizeInput(req.body);
   
   if (req.user.role === 'SECTION' && !req.user.sections.includes(payload.section)) {
@@ -607,7 +615,7 @@ app.get('/records/:id', authMiddleware, async (req, res) => {
   res.json(record);
 });
 
-app.put('/records/:id', authMiddleware, async (req, res) => {
+app.put('/records/:id', authMiddleware, denyViewer, async (req, res) => {
   try {
     const record = await db.getRecord(req.params.id);
     if (!record) return res.status(404).json({ error: 'Not found' });
@@ -701,7 +709,7 @@ app.put('/records/:id', authMiddleware, async (req, res) => {
   }
 });
 
-app.delete('/records/:id', authMiddleware, asyncHandler(async (req, res) => {
+app.delete('/records/:id', authMiddleware, denyViewer, asyncHandler(async (req, res) => {
   const record = await db.getRecord(req.params.id);
   if (!record) return res.status(404).json({ error: 'Not found' });
   if (req.user.role === 'SECTION' && !req.user.sections.includes(record.section)) {
@@ -760,7 +768,7 @@ app.delete('/records/:id', authMiddleware, asyncHandler(async (req, res) => {
   }
 }));
 
-app.post('/records/:id/upload', authMiddleware, upload.single('file'), async (req, res) => {
+app.post('/records/:id/upload', authMiddleware, denyViewer, upload.single('file'), async (req, res) => {
   const record = await db.getRecord(req.params.id);
   if (!record) return res.status(404).json({ error: 'Not found' });
   if (req.user.role === 'SECTION' && !req.user.sections.includes(record.section)) {
@@ -811,7 +819,7 @@ app.get('/records/:id/file', authMiddleware, async (req, res) => {
   res.sendFile(filePath);
 });
 
-app.delete('/records/:id/file', authMiddleware, async (req, res) => {
+app.delete('/records/:id/file', authMiddleware, denyViewer, async (req, res) => {
   const record = await db.getRecord(req.params.id);
   if (!record) return res.status(404).json({ error: 'Not found' });
   if (req.user.role === 'SECTION' && !req.user.sections.includes(record.section)) {

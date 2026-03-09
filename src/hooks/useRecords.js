@@ -445,8 +445,22 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
         row.receivedBy, row.actionTaken, row.remarksText,
         row.concernedUnits, toDisplayDate(row.dateSent),
       ]),
-      styles: { fontSize: 8, cellPadding: 2 },
+      styles: { fontSize: 7.5, cellPadding: 2, overflow: 'linebreak', valign: 'top' },
       headStyles: { fillColor: [31, 76, 156] },
+      columnStyles: {
+        0:  { cellWidth: 26 }, // MC Ctrl No
+        1:  { cellWidth: 26 }, // Section Ctrl No
+        2:  { cellWidth: 11 }, // Section
+        3:  { cellWidth: 17 }, // Date Received
+        4:  { cellWidth: 60 }, // Subject — wide so text fits in ~3-4 lines
+        5:  { cellWidth: 18 }, // From
+        6:  { cellWidth: 17 }, // Target Date
+        7:  { cellWidth: 20 }, // Received By
+        8:  { cellWidth: 17 }, // Action Taken
+        9:  { cellWidth: 20 }, // Remarks
+        10: { cellWidth: 20 }, // Concerned Units
+        11: { cellWidth: 17 }, // Date Sent
+      },
     });
 
     const pageWidth = doc.internal.pageSize.getWidth();

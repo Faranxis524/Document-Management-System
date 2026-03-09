@@ -2172,6 +2172,12 @@ textarea:focus {
   background: #dbeafe;
   color: #1d4ed8;
 }
+.user-management__role--viewer {
+  background: rgba(139, 92, 246, 0.1);
+  color: #7c3aed;
+  border: 1px solid rgba(139, 92, 246, 0.25);
+}
+
 .user-management__role--section {
   background: #dcfce7;
   color: #15803d;
