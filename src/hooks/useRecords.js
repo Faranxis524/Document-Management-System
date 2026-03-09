@@ -477,63 +477,71 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
     const periodStr   = [monthLabel, filterYear].filter(Boolean).join(' ') || 'All_Records';
 
     // ── Layout constants ──────────────────────────────────────────────────────
-    const LOGO_SIZE    = 22;   // mm — square logo
-    const HEADER_TOP   = 5;   // mm from top of page
-    const DIVIDER_Y    = HEADER_TOP + LOGO_SIZE + 2;          // 29 mm
-    const BANNER_Y     = DIVIDER_Y + 1;                       // 30 mm
-    const BANNER_H     = 8;                                   // mm
-    const TABLE_START  = BANNER_Y + BANNER_H + 3;             // 41 mm
+    const LOGO_SIZE    = 24;   // mm — square logo
+    const HEADER_TOP   = 6;    // mm from top of page
+    const TITLE_Y      = HEADER_TOP + LOGO_SIZE + 6;          // report title baseline
+    const DIVIDER_Y    = TITLE_Y + 2.5;
+    const TABLE_START  = DIVIDER_Y + 3;                       // keep table below header
     const FOOTER_Y     = pageH - 6;                           // 204 mm
 
     // ── Per-page header ───────────────────────────────────────────────────────
     const drawHeader = () => {
       const cx = pageW / 2;
 
-      // PNP logo — left
+      // Logos
       try { doc.addImage(pnpLogo, 'PNG', margin, HEADER_TOP, LOGO_SIZE, LOGO_SIZE); } catch (_) {}
-      // CIDG logo — right
       if (cidgPng) {
         try { doc.addImage(cidgPng, 'PNG', pageW - margin - LOGO_SIZE, HEADER_TOP, LOGO_SIZE, LOGO_SIZE); } catch (_) {}
       }
 
-      // Centered government text — indented to avoid overlapping logos
-      const textL = margin + LOGO_SIZE + 3;
-      const textR = pageW - margin - LOGO_SIZE - 3;
+      // Centered letterhead text (matches the screenshot)
+      const textL = margin + LOGO_SIZE + 4;
+      const textR = pageW - margin - LOGO_SIZE - 4;
       const textCx = (textL + textR) / 2;
 
-      doc.setTextColor(...GRAY_DARK);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(6.5);
-      doc.text('Republic of the Philippines', textCx, HEADER_TOP + 4.5, { align: 'center' });
-      doc.text('Department of the Interior and Local Government', textCx, HEADER_TOP + 8.5, { align: 'center' });
+      let y = HEADER_TOP + 4.2;
+      const lineH = 3.7;
 
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(...NAVY);
-      doc.text('PHILIPPINE NATIONAL POLICE', textCx, HEADER_TOP + 13.5, { align: 'center' });
-
+      doc.setTextColor(...GRAY_MID);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
+      doc.text('Republic of the Philippines', textCx, y, { align: 'center' });
+
+      y += lineH;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.2);
+      doc.text('NATIONAL POLICE COMMISSION', textCx, y, { align: 'center' });
+
+      y += lineH;
       doc.setTextColor(...GRAY_DARK);
-      doc.text('Criminal Investigation and Detection Group', textCx, HEADER_TOP + 18, { align: 'center' });
-
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor(...NAVY);
-      doc.text('REGIONAL FIELD UNIT 4A', textCx, HEADER_TOP + 22.5, { align: 'center' });
+      doc.setFontSize(8.6);
+      doc.text('PHILIPPINE NATIONAL POLICE', textCx, y, { align: 'center' });
 
-      // Divider line
-      doc.setDrawColor(...NAVY);
-      doc.setLineWidth(0.6);
+      y += lineH;
+      doc.setFontSize(8.2);
+      doc.text('CRIMINAL INVESTIGATION AND DETECTION GROUP', textCx, y, { align: 'center' });
+
+      y += lineH;
+      doc.setFontSize(8.2);
+      doc.text('REGIONAL FIELD UNIT 4A', textCx, y, { align: 'center' });
+
+      y += lineH;
+      doc.setTextColor(...GRAY_MID);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.text('Camp BGen Vicente P. Lim, Calamba City, Laguna', textCx, y, { align: 'center' });
+
+      // Report title (kept separate from letterhead)
+      doc.setTextColor(...GRAY_DARK);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('MESSAGE CENTER MASTER LIST OF COMMUNICATIONS', cx, TITLE_Y, { align: 'center' });
+
+      // Thin divider before table
+      doc.setDrawColor(...GRAY_MID);
+      doc.setLineWidth(0.35);
       doc.line(margin, DIVIDER_Y, pageW - margin, DIVIDER_Y);
-
-      // Title banner
-      doc.setFillColor(...NAVY);
-      doc.rect(margin, BANNER_Y, contentW, BANNER_H, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9.5);
-      doc.setTextColor(...WHITE);
-      doc.text('MESSAGE CENTER MASTER LIST OF COMMUNICATIONS', cx, BANNER_Y + 5.5, { align: 'center' });
     };
 
     // ── Per-page footer ───────────────────────────────────────────────────────
