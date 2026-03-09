@@ -23,6 +23,24 @@ const DB_PATH  = path.resolve(__dirname, 'server', 'data', 'dms.sqlite');
 const IMPORTED_BY = 'CSV Import';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
+
+// Convert D-Mon-YY / DD-Mon-YY / DD-Mon-YYYY → YYYY-MM-DD; leaves ISO dates untouched
+const MONTHS_MAP = {
+  jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',
+  jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12',
+};
+function normalizeDate(value) {
+  if (!value || /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) return value; // already ISO or blank
+  const m = value.trim().match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
+  if (!m) return value; // unknown format — keep as-is
+  const day  = m[1].padStart(2, '0');
+  const mon  = MONTHS_MAP[m[2].toLowerCase()];
+  if (!mon) return value;
+  const rawY = parseInt(m[3], 10);
+  const year = rawY < 100 ? 2000 + rawY : rawY;
+  return `${year}-${mon}-${day}`;
+}
+
 function calculateStatus(dateSent, targetDate) {
   if (dateSent && dateSent.trim()) return 'Completed';
   if (targetDate && /^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
@@ -109,15 +127,15 @@ function parseCSVLine(line) {
     const mcCtrlNo      = cols[0]  || '';
     const sectionCtrlNo = cols[1]  || '';
     const section       = cols[2]  || 'INVES';
-    const dateReceived  = cols[3]  || '';
+    const dateReceived  = normalizeDate(cols[3]  || '');
     const subjectText   = cols[4]  || '';
     const fromValue     = cols[5]  || '';
-    const targetDate    = cols[6]  || '';
+    const targetDate    = normalizeDate(cols[6]  || '');
     const receivedBy    = cols[7]  || '';
     const actionTaken   = cols[8]  || '';
     const remarks       = cols[9]  || '';
     const concernedUnits = cols[10] || '';
-    const dateSent      = cols[11] || '';
+    const dateSent      = normalizeDate(cols[11] || '');
 
     // Skip if mcCtrlNo is blank
     if (!mcCtrlNo) {

@@ -81,6 +81,23 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+// Convert D-Mon-YY / DD-Mon-YY / DD-Mon-YYYY → YYYY-MM-DD; leaves ISO dates and blanks untouched
+const MONTH_NUM = {
+  jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',
+  jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12',
+};
+function normalizeDate(value) {
+  if (!value || /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) return value;
+  const m = value.trim().match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
+  if (!m) return value;
+  const day  = m[1].padStart(2, '0');
+  const mon  = MONTH_NUM[m[2].toLowerCase()];
+  if (!mon) return value;
+  const rawY = parseInt(m[3], 10);
+  const year = rawY < 100 ? 2000 + rawY : rawY;
+  return `${year}-${mon}-${day}`;
+}
+
 function getMonthFolder(dateString) {
   const sourceDate = dateString ? new Date(`${dateString}T00:00:00`) : new Date();
   const safeDate = Number.isNaN(sourceDate.getTime()) ? new Date() : sourceDate;
@@ -957,15 +974,15 @@ app.post('/import/csv', authMiddleware, requireRole(['MC']), asyncHandler(async 
     const mcCtrlNo       = cols[0]  || '';
     const sectionCtrlNo  = cols[1]  || '';
     const sec            = cols[2]  || section;
-    const dateReceived   = cols[3]  || '';
+    const dateReceived   = normalizeDate(cols[3]  || '');
     const subjectText    = cols[4]  || '';
     const fromValue      = cols[5]  || '';
-    const targetDate     = cols[6]  || '';
+    const targetDate     = normalizeDate(cols[6]  || '');
     const receivedBy     = cols[7]  || '';
     const actionTaken    = cols[8]  || '';
     const remarks        = cols[9]  || '';
     const concernedUnits = cols[10] || '';
-    const dateSent       = cols[11] || '';
+    const dateSent       = normalizeDate(cols[11] || '');
 
     if (!mcCtrlNo) { skipped.push(`(blank mcCtrlNo) ${subjectText.slice(0, 60)}`); continue; }
     if (existingSet.has(mcCtrlNo)) { skipped.push(`${mcCtrlNo} (already exists)`); continue; }

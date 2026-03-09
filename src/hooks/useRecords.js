@@ -426,6 +426,18 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
   };
 
   // ── Export PDF (client-side) ───────────────────────────────────────────────
+  // jsPDF's built-in Helvetica only supports Latin-1. Any combining Unicode chars
+  // (accents, diacritics, etc.) cause it to fall back to character-by-character rendering.
+  // Normalize + strip combining marks so text renders cleanly.
+  const pdfSafe = (val) => {
+    if (!val) return '';
+    return String(val)
+      .normalize('NFD')                        // decompose é → e + ́
+      .replace(/[\u0300-\u036f]/g, '')         // strip combining diacritical marks
+      // eslint-disable-next-line no-control-regex
+      .replace(/[^\u0000-\u00FF]/g, '?');          // replace remaining non-latin1 with ?
+  };
+
   const handleExportPdf = (displayRecords, activeSection, filterMonth, filterYear) => {
     const doc = new jsPDF({ orientation: 'landscape' });
     doc.setFontSize(12);
@@ -439,11 +451,11 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
       startY: filterMonth || filterYear ? 22 : 18,
       head: [pdfColumns],
       body: displayRecords.map((row) => [
-        row.mcCtrlNo, row.sectionCtrlNo, row.section,
-        toDisplayDate(row.dateReceived), row.subjectText,
-        row.fromValue, toDisplayDate(row.targetDate) || row.targetDate,
-        row.receivedBy, row.actionTaken, row.remarksText,
-        row.concernedUnits, toDisplayDate(row.dateSent),
+        pdfSafe(row.mcCtrlNo), pdfSafe(row.sectionCtrlNo), pdfSafe(row.section),
+        pdfSafe(toDisplayDate(row.dateReceived)), pdfSafe(row.subjectText),
+        pdfSafe(row.fromValue), pdfSafe(toDisplayDate(row.targetDate) || row.targetDate),
+        pdfSafe(row.receivedBy), pdfSafe(row.actionTaken), pdfSafe(row.remarksText),
+        pdfSafe(row.concernedUnits), pdfSafe(toDisplayDate(row.dateSent)),
       ]),
       styles: { fontSize: 7.5, cellPadding: 2, overflow: 'linebreak', valign: 'top' },
       headStyles: { fillColor: [31, 76, 156] },
@@ -474,8 +486,8 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
       const x = margin + blockW * i;
       const x1 = x + 8, x2 = x + blockW - 8, cx = (x1 + x2) / 2;
       doc.line(x1, signY, x2, signY);
-      doc.text(person.name, cx, signY + 6, { align: 'center' });
-      doc.text(person.position, cx, signY + 12, { align: 'center' });
+      doc.text(pdfSafe(person.name), cx, signY + 6, { align: 'center' });
+      doc.text(pdfSafe(person.position), cx, signY + 12, { align: 'center' });
     });
     doc.save('records.pdf');
   };
