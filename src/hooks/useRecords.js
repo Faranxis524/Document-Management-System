@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import cidgLogo from '../assets/logo.png';
 import {
   API_BASE,
   INITIAL_RECORD,
@@ -439,57 +440,207 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
   };
 
   const handleExportPdf = (displayRecords, activeSection, filterMonth, filterYear) => {
-    const doc = new jsPDF({ orientation: 'landscape' });
-    doc.setFontSize(12);
-    doc.text('CIDG RFU4A Message Center Master List', 14, 12);
-    if (filterMonth || filterYear) {
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pageW  = doc.internal.pageSize.getWidth();   // 297 mm
+    const pageH  = doc.internal.pageSize.getHeight();  // 210 mm
+    const margin = 12;
+    const contentW = pageW - margin * 2;
+
+    // ── Design tokens ────────────────────────────────────────────────────────
+    const NAVY      = [27,  79, 138];
+    const NAVY_DARK = [15,  50, 100];
+    const NAVY_LITE = [235, 241, 255];
+    const GRAY_MID  = [110, 110, 110];
+    const GRAY_DARK = [40,  40,  40];
+    const WHITE     = [255, 255, 255];
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    const MONTH_NAMES = ['','January','February','March','April','May','June',
+                         'July','August','September','October','November','December'];
+    const monthLabel  = filterMonth ? (MONTH_NAMES[parseInt(filterMonth, 10)] || filterMonth) : '';
+    const periodStr   = [monthLabel, filterYear].filter(Boolean).join(' ') || 'All Records';
+    const sectionTitle =
+      activeSection === 'MC Master List' ? 'ALL SECTIONS' :
+      activeSection ? activeSection.toUpperCase() : 'ALL SECTIONS';
+
+    // ── Per-page header ───────────────────────────────────────────────────────
+    const drawHeader = (pageNum, totalPages) => {
+      // Logo
+      try { doc.addImage(cidgLogo, 'PNG', margin, 5, 22, 22); } catch (_) {}
+
+      // Government text hierarchy — centered
+      const cx = pageW / 2;
+      doc.setTextColor(...GRAY_MID);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.5);
+      doc.text('Republic of the Philippines', cx, 8.5, { align: 'center' });
+      doc.text('Department of the Interior and Local Government', cx, 12, { align: 'center' });
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(...NAVY);
+      doc.text('PHILIPPINE NATIONAL POLICE', cx, 16.5, { align: 'center' });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(...GRAY_DARK);
+      doc.text('Criminal Investigation and Detection Group', cx, 21, { align: 'center' });
+      doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
-      doc.text(`Filtered by: ${filterMonth || 'All Months'} ${filterYear || 'All Years'}`, 14, 17);
-    }
+      doc.setTextColor(...NAVY);
+      doc.text('REGIONAL FIELD UNIT 4A', cx, 25.5, { align: 'center' });
+
+      // Thick navy divider
+      doc.setDrawColor(...NAVY);
+      doc.setLineWidth(0.8);
+      doc.line(margin, 29, pageW - margin, 29);
+
+      // Title banner
+      doc.setFillColor(...NAVY);
+      doc.rect(margin, 30, contentW, 9, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(...WHITE);
+      doc.text('MESSAGE CENTER MASTER LIST OF COMMUNICATIONS', cx, 36, { align: 'center' });
+
+      // Info strip
+      doc.setFillColor(243, 246, 255);
+      doc.rect(margin, 39, contentW, 6.5, 'F');
+      doc.setDrawColor(190, 205, 230);
+      doc.setLineWidth(0.25);
+      doc.rect(margin, 39, contentW, 6.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(...GRAY_DARK);
+      doc.text(`Section: ${sectionTitle}`, margin + 3, 43.5);
+      doc.text(`Period: ${periodStr}`, cx, 43.5, { align: 'center' });
+      doc.text(`Page ${pageNum} of ${totalPages}`, pageW - margin - 3, 43.5, { align: 'right' });
+    };
+
+    // ── Per-page footer ───────────────────────────────────────────────────────
+    const drawFooter = () => {
+      const fy = pageH - 5.5;
+      doc.setDrawColor(...NAVY);
+      doc.setLineWidth(0.3);
+      doc.line(margin, fy - 2, pageW - margin, fy - 2);
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(6);
+      doc.setTextColor(...GRAY_MID);
+      const now = new Date();
+      const generated = now.toLocaleString('en-PH', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      doc.text('FOR OFFICIAL USE ONLY', margin, fy);
+      doc.text(`Generated: ${generated}`, pageW - margin, fy, { align: 'right' });
+    };
+
+    // ── Table ─────────────────────────────────────────────────────────────────
     const pdfColumns = TABLE_COLUMNS.filter((c) => c !== 'Status');
     autoTable(doc, {
-      startY: filterMonth || filterYear ? 22 : 18,
+      startY: 47,
+      margin: { left: margin, right: margin, bottom: 12 },
       head: [pdfColumns],
       body: displayRecords.map((row) => [
-        pdfSafe(row.mcCtrlNo), pdfSafe(row.sectionCtrlNo), pdfSafe(row.section),
-        pdfSafe(toDisplayDate(row.dateReceived)), pdfSafe(row.subjectText),
-        pdfSafe(row.fromValue), pdfSafe(toDisplayDate(row.targetDate) || row.targetDate),
-        pdfSafe(row.receivedBy), pdfSafe(row.actionTaken), pdfSafe(row.remarksText),
-        pdfSafe(row.concernedUnits), pdfSafe(toDisplayDate(row.dateSent)),
+        pdfSafe(row.mcCtrlNo),
+        pdfSafe(row.sectionCtrlNo),
+        pdfSafe(row.section),
+        pdfSafe(toDisplayDate(row.dateReceived)),
+        pdfSafe(row.subjectText),
+        pdfSafe(row.fromValue),
+        pdfSafe(toDisplayDate(row.targetDate) || row.targetDate),
+        pdfSafe(row.receivedBy),
+        pdfSafe(row.actionTaken),
+        pdfSafe(row.remarksText),
+        pdfSafe(row.concernedUnits),
+        pdfSafe(toDisplayDate(row.dateSent)),
       ]),
-      styles: { fontSize: 7.5, cellPadding: 2, overflow: 'linebreak', valign: 'top' },
-      headStyles: { fillColor: [31, 76, 156] },
+      styles: {
+        fontSize: 6.8,
+        cellPadding: { top: 2, bottom: 2, left: 1.8, right: 1.8 },
+        overflow: 'linebreak',
+        valign: 'top',
+        textColor: GRAY_DARK,
+        lineColor: [200, 212, 232],
+        lineWidth: 0.15,
+      },
+      headStyles: {
+        fillColor: NAVY,
+        textColor: WHITE,
+        fontStyle: 'bold',
+        fontSize: 7,
+        halign: 'center',
+        valign: 'middle',
+        lineColor: NAVY_DARK,
+        lineWidth: 0.3,
+        cellPadding: { top: 2.5, bottom: 2.5, left: 1.8, right: 1.8 },
+      },
+      alternateRowStyles: { fillColor: NAVY_LITE },
       columnStyles: {
-        0:  { cellWidth: 26 }, // MC Ctrl No
-        1:  { cellWidth: 26 }, // Section Ctrl No
-        2:  { cellWidth: 11 }, // Section
-        3:  { cellWidth: 17 }, // Date Received
-        4:  { cellWidth: 60 }, // Subject — wide so text fits in ~3-4 lines
-        5:  { cellWidth: 18 }, // From
-        6:  { cellWidth: 17 }, // Target Date
-        7:  { cellWidth: 20 }, // Received By
-        8:  { cellWidth: 17 }, // Action Taken
-        9:  { cellWidth: 20 }, // Remarks
-        10: { cellWidth: 20 }, // Concerned Units
-        11: { cellWidth: 17 }, // Date Sent
+        0:  { cellWidth: 26, halign: 'center' },
+        1:  { cellWidth: 26, halign: 'center' },
+        2:  { cellWidth: 11, halign: 'center' },
+        3:  { cellWidth: 18, halign: 'center' },
+        4:  { cellWidth: 58 },
+        5:  { cellWidth: 17, halign: 'center' },
+        6:  { cellWidth: 18, halign: 'center' },
+        7:  { cellWidth: 18, halign: 'center' },
+        8:  { cellWidth: 18, halign: 'center' },
+        9:  { cellWidth: 20 },
+        10: { cellWidth: 20, halign: 'center' },
+        11: { cellWidth: 18, halign: 'center' },
+      },
+      didDrawPage: (data) => {
+        drawHeader(data.pageNumber, data.pageCount);
+        drawFooter();
       },
     });
 
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 14;
-    const blockW = (pageWidth - margin * 2) / 3;
-    let signY = (doc.lastAutoTable?.finalY || 24) + 20;
-    if (signY > pageHeight - 26) { doc.addPage(); signY = 30; }
-    doc.setFontSize(10);
+    // ── Signatory block ───────────────────────────────────────────────────────
+    const blockW  = contentW / 3;
+    let   signY   = (doc.lastAutoTable?.finalY || 50) + 12;
+    const needsNewPage = signY > pageH - 42;
+    if (needsNewPage) {
+      doc.addPage();
+      signY = 20;
+      const tp = doc.internal.getNumberOfPages();
+      drawHeader(tp, tp);
+      drawFooter();
+    }
+
+    const SIGN_LABELS = ['Prepared by:', 'Noted by:', 'Approved by:'];
     REPORT_SIGNATORIES.forEach((person, i) => {
-      const x = margin + blockW * i;
-      const x1 = x + 8, x2 = x + blockW - 8, cx = (x1 + x2) / 2;
-      doc.line(x1, signY, x2, signY);
-      doc.text(pdfSafe(person.name), cx, signY + 6, { align: 'center' });
-      doc.text(pdfSafe(person.position), cx, signY + 12, { align: 'center' });
+      const bx  = margin + blockW * i;
+      const bcx = bx + blockW / 2;
+
+      // Label
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(...NAVY);
+      doc.text(SIGN_LABELS[i], bx + 4, signY + 2);
+
+      // Signature line
+      const lineY = signY + 15;
+      doc.setDrawColor(...GRAY_MID);
+      doc.setLineWidth(0.35);
+      doc.line(bx + 6, lineY, bx + blockW - 6, lineY);
+
+      // Name
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(...GRAY_DARK);
+      doc.text(pdfSafe(person.name) || '________________________________', bcx, lineY + 5, { align: 'center' });
+
+      // Position
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.8);
+      doc.setTextColor(...GRAY_MID);
+      doc.text(pdfSafe(person.position), bcx, lineY + 10, { align: 'center' });
     });
-    doc.save('records.pdf');
+
+    // Record count note
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(6.5);
+    doc.setTextColor(...GRAY_MID);
+    doc.text(`Total records: ${displayRecords.length}`, margin, signY + 32);
+
+    const fileName = `DMS_Records_${periodStr.replace(/\s+/g, '_')}.pdf`;
+    doc.save(fileName);
   };
 
   // ── Export CSV/Excel (server-side) ─────────────────────────────────────────
