@@ -479,9 +479,10 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
     // ── Layout constants ──────────────────────────────────────────────────────
     const LOGO_SIZE    = 24;   // mm — square logo
     const HEADER_TOP   = 6;    // mm from top of page
-    const TITLE_Y      = HEADER_TOP + LOGO_SIZE + 6;          // report title baseline
-    const DIVIDER_Y    = TITLE_Y + 2.5;
-    const TABLE_START  = DIVIDER_Y + 3;                       // keep table below header
+    // Provide extra breathing room between letterhead and report title
+    const TITLE_Y      = HEADER_TOP + LOGO_SIZE + 10;         // report title baseline
+    const DIVIDER_Y    = TITLE_Y + 3.5;
+    const TABLE_START  = DIVIDER_Y + 4;                       // keep table below header
     const FOOTER_Y     = pageH - 6;                           // 204 mm
 
     // ── Per-page header ───────────────────────────────────────────────────────
@@ -489,47 +490,52 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
       const cx = pageW / 2;
 
       // Logos
-      try { doc.addImage(pnpLogo, 'PNG', margin, HEADER_TOP, LOGO_SIZE, LOGO_SIZE); } catch (_) {}
+      const logoInset = 14; // pull logos closer to the centered header text
+      const leftLogoX = margin + logoInset;
+      const rightLogoX = pageW - margin - logoInset - LOGO_SIZE;
+
+      try { doc.addImage(pnpLogo, 'PNG', leftLogoX, HEADER_TOP, LOGO_SIZE, LOGO_SIZE); } catch (_) {}
       if (cidgPng) {
-        try { doc.addImage(cidgPng, 'PNG', pageW - margin - LOGO_SIZE, HEADER_TOP, LOGO_SIZE, LOGO_SIZE); } catch (_) {}
+        try { doc.addImage(cidgPng, 'PNG', rightLogoX, HEADER_TOP, LOGO_SIZE, LOGO_SIZE); } catch (_) {}
       }
 
       // Centered letterhead text (matches the screenshot)
-      const textL = margin + LOGO_SIZE + 4;
-      const textR = pageW - margin - LOGO_SIZE - 4;
+      const textGap = 0.5; // small gap between logo and text block
+      const textL = leftLogoX + LOGO_SIZE + textGap;
+      const textR = rightLogoX - textGap;
       const textCx = (textL + textR) / 2;
 
-      let y = HEADER_TOP + 4.2;
-      const lineH = 3.7;
+      let y = HEADER_TOP + 4.6;
+      const lineH = 4.4;
 
       doc.setTextColor(...GRAY_MID);
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
+      doc.setFontSize(10);
       doc.text('Republic of the Philippines', textCx, y, { align: 'center' });
 
       y += lineH;
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.2);
+      doc.setFontSize(11);
       doc.text('NATIONAL POLICE COMMISSION', textCx, y, { align: 'center' });
 
       y += lineH;
       doc.setTextColor(...GRAY_DARK);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8.6);
+      doc.setFontSize(12);
       doc.text('PHILIPPINE NATIONAL POLICE', textCx, y, { align: 'center' });
 
       y += lineH;
-      doc.setFontSize(8.2);
+      doc.setFontSize(12);
       doc.text('CRIMINAL INVESTIGATION AND DETECTION GROUP', textCx, y, { align: 'center' });
 
       y += lineH;
-      doc.setFontSize(8.2);
+      doc.setFontSize(12);
       doc.text('REGIONAL FIELD UNIT 4A', textCx, y, { align: 'center' });
 
       y += lineH;
       doc.setTextColor(...GRAY_MID);
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
+      doc.setFontSize(10);
       doc.text('Camp BGen Vicente P. Lim, Calamba City, Laguna', textCx, y, { align: 'center' });
 
       // Report title (kept separate from letterhead)
