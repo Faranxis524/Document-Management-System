@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import pnpLogo   from '../assets/pnp-logo.png';
+import cidgLogoSvg from '../assets/cidg-logo.svg';
 import {
   API_BASE,
   INITIAL_RECORD,
@@ -438,43 +440,123 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
       .replace(/[^\u0000-\u00FF]/g, '?');          // replace remaining non-latin1 with ?
   };
 
-  const handleExportPdf = (displayRecords, activeSection, filterMonth, filterYear) => {
+  const handleExportPdf = async (displayRecords, activeSection, filterMonth, filterYear) => {
+    // Convert CIDG SVG → PNG data URL via canvas (jsPDF only supports raster images)
+    const svgToPng = (svgUrl) => new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = 4;
+        const canvas = document.createElement('canvas');
+        canvas.width = 80 * scale; canvas.height = 80 * scale;
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = () => resolve(null);
+      img.src = svgUrl;
+    });
+    const cidgPng = await svgToPng(cidgLogoSvg);
+
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    const pageW  = doc.internal.pageSize.getWidth();   // 297 mm
-    const pageH  = doc.internal.pageSize.getHeight();  // 210 mm
-    const margin = 12;
+    const pageW    = doc.internal.pageSize.getWidth();   // 297 mm
+    const pageH    = doc.internal.pageSize.getHeight();  // 210 mm
+    const margin   = 12;
     const contentW = pageW - margin * 2;
 
     // ── Design tokens ────────────────────────────────────────────────────────
     const NAVY      = [27,  79, 138];
-    const NAVY_DARK = [15,  50, 100];
     const NAVY_LITE = [235, 241, 255];
+    const NAVY_DARK = [15,  50, 100];
     const GRAY_MID  = [110, 110, 110];
     const GRAY_DARK = [40,  40,  40];
     const WHITE     = [255, 255, 255];
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ── Month / period helpers ────────────────────────────────────────────────
     const MONTH_NAMES = ['','January','February','March','April','May','June',
                          'July','August','September','October','November','December'];
     const monthLabel  = filterMonth ? (MONTH_NAMES[parseInt(filterMonth, 10)] || filterMonth) : '';
     const periodStr   = [monthLabel, filterYear].filter(Boolean).join(' ') || 'All_Records';
 
+    // ── Layout constants ──────────────────────────────────────────────────────
+    const LOGO_SIZE    = 22;   // mm — square logo
+    const HEADER_TOP   = 5;   // mm from top of page
+    const DIVIDER_Y    = HEADER_TOP + LOGO_SIZE + 2;          // 29 mm
+    const BANNER_Y     = DIVIDER_Y + 1;                       // 30 mm
+    const BANNER_H     = 8;                                   // mm
+    const TABLE_START  = BANNER_Y + BANNER_H + 3;             // 41 mm
+    const FOOTER_Y     = pageH - 6;                           // 204 mm
+
     // ── Per-page header ───────────────────────────────────────────────────────
     const drawHeader = () => {
       const cx = pageW / 2;
+
+      // PNP logo — left
+      try { doc.addImage(pnpLogo, 'PNG', margin, HEADER_TOP, LOGO_SIZE, LOGO_SIZE); } catch (_) {}
+      // CIDG logo — right
+      if (cidgPng) {
+        try { doc.addImage(cidgPng, 'PNG', pageW - margin - LOGO_SIZE, HEADER_TOP, LOGO_SIZE, LOGO_SIZE); } catch (_) {}
+      }
+
+      // Centered government text — indented to avoid overlapping logos
+      const textL = margin + LOGO_SIZE + 3;
+      const textR = pageW - margin - LOGO_SIZE - 3;
+      const textCx = (textL + textR) / 2;
+
+      doc.setTextColor(...GRAY_DARK);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.5);
+      doc.text('Republic of the Philippines', textCx, HEADER_TOP + 4.5, { align: 'center' });
+      doc.text('Department of the Interior and Local Government', textCx, HEADER_TOP + 8.5, { align: 'center' });
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(...NAVY);
+      doc.text('PHILIPPINE NATIONAL POLICE', textCx, HEADER_TOP + 13.5, { align: 'center' });
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(...GRAY_DARK);
+      doc.text('Criminal Investigation and Detection Group', textCx, HEADER_TOP + 18, { align: 'center' });
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(...NAVY);
+      doc.text('REGIONAL FIELD UNIT 4A', textCx, HEADER_TOP + 22.5, { align: 'center' });
+
+      // Divider line
+      doc.setDrawColor(...NAVY);
+      doc.setLineWidth(0.6);
+      doc.line(margin, DIVIDER_Y, pageW - margin, DIVIDER_Y);
+
+      // Title banner
       doc.setFillColor(...NAVY);
-      doc.rect(margin, 8, contentW, 9, 'F');
+      doc.rect(margin, BANNER_Y, contentW, BANNER_H, 'F');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9.5);
       doc.setTextColor(...WHITE);
-      doc.text('MESSAGE CENTER MASTER LIST OF COMMUNICATIONS', cx, 14.5, { align: 'center' });
+      doc.text('MESSAGE CENTER MASTER LIST OF COMMUNICATIONS', cx, BANNER_Y + 5.5, { align: 'center' });
+    };
+
+    // ── Per-page footer ───────────────────────────────────────────────────────
+    const drawFooter = () => {
+      doc.setDrawColor(...GRAY_MID);
+      doc.setLineWidth(0.2);
+      doc.line(margin, FOOTER_Y - 2, pageW - margin, FOOTER_Y - 2);
+      const now = new Date();
+      const generated = now.toLocaleString('en-PH', {
+        month: 'long', day: 'numeric', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      });
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(6);
+      doc.setTextColor(...GRAY_MID);
+      doc.text(`Generated: ${generated}`, pageW - margin, FOOTER_Y, { align: 'right' });
     };
 
     // ── Table ─────────────────────────────────────────────────────────────────
     const pdfColumns = TABLE_COLUMNS.filter((c) => c !== 'Status');
     autoTable(doc, {
-      startY: 20,
-      margin: { left: margin, right: margin, bottom: 10 },
+      startY: TABLE_START,
+      margin: { left: margin, right: margin, top: TABLE_START, bottom: 14 },
       head: [pdfColumns],
       body: displayRecords.map((row) => [
         pdfSafe(row.mcCtrlNo),
@@ -512,32 +594,37 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
       },
       alternateRowStyles: { fillColor: NAVY_LITE },
       columnStyles: {
-        0:  { cellWidth: 26, halign: 'center' },
-        1:  { cellWidth: 26, halign: 'center' },
-        2:  { cellWidth: 11, halign: 'center' },
-        3:  { cellWidth: 18, halign: 'center' },
-        4:  { cellWidth: 58 },
-        5:  { cellWidth: 17, halign: 'center' },
-        6:  { cellWidth: 18, halign: 'center' },
-        7:  { cellWidth: 18, halign: 'center' },
-        8:  { cellWidth: 18, halign: 'center' },
-        9:  { cellWidth: 20 },
-        10: { cellWidth: 20, halign: 'center' },
-        11: { cellWidth: 18, halign: 'center' },
+        0:  { cellWidth: 26, halign: 'center' },  // MC Ctrl No
+        1:  { cellWidth: 26, halign: 'center' },  // Section Ctrl No
+        2:  { cellWidth: 15, halign: 'center' },  // Section (was 11 — too narrow)
+        3:  { cellWidth: 18, halign: 'center' },  // Date Received
+        4:  { cellWidth: 55 },                    // Subject
+        5:  { cellWidth: 17, halign: 'center' },  // From
+        6:  { cellWidth: 18, halign: 'center' },  // Target Date
+        7:  { cellWidth: 18, halign: 'center' },  // Received By
+        8:  { cellWidth: 18, halign: 'center' },  // Action Taken
+        9:  { cellWidth: 20 },                    // Remarks
+        10: { cellWidth: 20, halign: 'center' },  // Concerned Units
+        11: { cellWidth: 18, halign: 'center' },  // Date Sent
       },
-      didDrawPage: () => {
+      didDrawPage: (data) => {
         drawHeader();
+        drawFooter();
+        // Push table content below the header on every page
+        if (data.pageNumber > 1) {
+          // autoTable handles this via margin.top but we set it via startY for p1
+        }
       },
     });
 
     // ── Signatory block ───────────────────────────────────────────────────────
     const blockW  = contentW / 3;
-    let   signY   = (doc.lastAutoTable?.finalY || 50) + 12;
-    const needsNewPage = signY > pageH - 42;
-    if (needsNewPage) {
+    let   signY   = (doc.lastAutoTable?.finalY || TABLE_START) + 10;
+    if (signY > FOOTER_Y - 38) {
       doc.addPage();
-      signY = 20;
       drawHeader();
+      drawFooter();
+      signY = TABLE_START;
     }
 
     const SIGN_LABELS = ['Prepared by:', 'Noted by:', 'Approved by:'];
@@ -545,36 +632,31 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
       const bx  = margin + blockW * i;
       const bcx = bx + blockW / 2;
 
-      // Label
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7);
       doc.setTextColor(...NAVY);
       doc.text(SIGN_LABELS[i], bx + 4, signY + 2);
 
-      // Signature line
-      const lineY = signY + 15;
+      const lineY = signY + 14;
       doc.setDrawColor(...GRAY_MID);
       doc.setLineWidth(0.35);
       doc.line(bx + 6, lineY, bx + blockW - 6, lineY);
 
-      // Name
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7.5);
       doc.setTextColor(...GRAY_DARK);
       doc.text(pdfSafe(person.name) || '________________________________', bcx, lineY + 5, { align: 'center' });
 
-      // Position
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6.8);
       doc.setTextColor(...GRAY_MID);
       doc.text(pdfSafe(person.position), bcx, lineY + 10, { align: 'center' });
     });
 
-    // Record count note
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(6.5);
     doc.setTextColor(...GRAY_MID);
-    doc.text(`Total records: ${displayRecords.length}`, margin, signY + 32);
+    doc.text(`Total records: ${displayRecords.length}`, margin, signY + 30);
 
     const fileName = `DMS_Records_${periodStr.replace(/\s+/g, '_')}.pdf`;
     doc.save(fileName);
