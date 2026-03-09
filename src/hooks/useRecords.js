@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import cidgLogo from '../assets/logo.png';
 import {
   API_BASE,
   INITIAL_RECORD,
@@ -458,83 +457,24 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
     const MONTH_NAMES = ['','January','February','March','April','May','June',
                          'July','August','September','October','November','December'];
     const monthLabel  = filterMonth ? (MONTH_NAMES[parseInt(filterMonth, 10)] || filterMonth) : '';
-    const periodStr   = [monthLabel, filterYear].filter(Boolean).join(' ') || 'All Records';
-    const sectionTitle =
-      activeSection === 'MC Master List' ? 'ALL SECTIONS' :
-      activeSection ? activeSection.toUpperCase() : 'ALL SECTIONS';
+    const periodStr   = [monthLabel, filterYear].filter(Boolean).join(' ') || 'All_Records';
 
     // ── Per-page header ───────────────────────────────────────────────────────
-    const drawHeader = (pageNum, totalPages) => {
-      // Logo
-      try { doc.addImage(cidgLogo, 'PNG', margin, 5, 22, 22); } catch (_) {}
-
-      // Government text hierarchy — centered
+    const drawHeader = () => {
       const cx = pageW / 2;
-      doc.setTextColor(...GRAY_MID);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(6.5);
-      doc.text('Republic of the Philippines', cx, 8.5, { align: 'center' });
-      doc.text('Department of the Interior and Local Government', cx, 12, { align: 'center' });
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8.5);
-      doc.setTextColor(...NAVY);
-      doc.text('PHILIPPINE NATIONAL POLICE', cx, 16.5, { align: 'center' });
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(...GRAY_DARK);
-      doc.text('Criminal Investigation and Detection Group', cx, 21, { align: 'center' });
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
-      doc.setTextColor(...NAVY);
-      doc.text('REGIONAL FIELD UNIT 4A', cx, 25.5, { align: 'center' });
-
-      // Thick navy divider
-      doc.setDrawColor(...NAVY);
-      doc.setLineWidth(0.8);
-      doc.line(margin, 29, pageW - margin, 29);
-
-      // Title banner
       doc.setFillColor(...NAVY);
-      doc.rect(margin, 30, contentW, 9, 'F');
+      doc.rect(margin, 8, contentW, 9, 'F');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9.5);
       doc.setTextColor(...WHITE);
-      doc.text('MESSAGE CENTER MASTER LIST OF COMMUNICATIONS', cx, 36, { align: 'center' });
-
-      // Info strip
-      doc.setFillColor(243, 246, 255);
-      doc.rect(margin, 39, contentW, 6.5, 'F');
-      doc.setDrawColor(190, 205, 230);
-      doc.setLineWidth(0.25);
-      doc.rect(margin, 39, contentW, 6.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
-      doc.setTextColor(...GRAY_DARK);
-      doc.text(`Section: ${sectionTitle}`, margin + 3, 43.5);
-      doc.text(`Period: ${periodStr}`, cx, 43.5, { align: 'center' });
-      doc.text(`Page ${pageNum} of ${totalPages}`, pageW - margin - 3, 43.5, { align: 'right' });
-    };
-
-    // ── Per-page footer ───────────────────────────────────────────────────────
-    const drawFooter = () => {
-      const fy = pageH - 5.5;
-      doc.setDrawColor(...NAVY);
-      doc.setLineWidth(0.3);
-      doc.line(margin, fy - 2, pageW - margin, fy - 2);
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(6);
-      doc.setTextColor(...GRAY_MID);
-      const now = new Date();
-      const generated = now.toLocaleString('en-PH', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-      doc.text('FOR OFFICIAL USE ONLY', margin, fy);
-      doc.text(`Generated: ${generated}`, pageW - margin, fy, { align: 'right' });
+      doc.text('MESSAGE CENTER MASTER LIST OF COMMUNICATIONS', cx, 14.5, { align: 'center' });
     };
 
     // ── Table ─────────────────────────────────────────────────────────────────
     const pdfColumns = TABLE_COLUMNS.filter((c) => c !== 'Status');
     autoTable(doc, {
-      startY: 47,
-      margin: { left: margin, right: margin, bottom: 12 },
+      startY: 20,
+      margin: { left: margin, right: margin, bottom: 10 },
       head: [pdfColumns],
       body: displayRecords.map((row) => [
         pdfSafe(row.mcCtrlNo),
@@ -585,9 +525,8 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
         10: { cellWidth: 20, halign: 'center' },
         11: { cellWidth: 18, halign: 'center' },
       },
-      didDrawPage: (data) => {
-        drawHeader(data.pageNumber, data.pageCount);
-        drawFooter();
+      didDrawPage: () => {
+        drawHeader();
       },
     });
 
@@ -598,9 +537,7 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
     if (needsNewPage) {
       doc.addPage();
       signY = 20;
-      const tp = doc.internal.getNumberOfPages();
-      drawHeader(tp, tp);
-      drawFooter();
+      drawHeader();
     }
 
     const SIGN_LABELS = ['Prepared by:', 'Noted by:', 'Approved by:'];
