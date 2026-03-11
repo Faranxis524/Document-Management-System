@@ -529,23 +529,17 @@ app.get('/records', authMiddleware, async (req, res) => {
   }
   const allRecords = await db.listRecords(filters);
   
-  // Pagination support (currently returns all, but infrastructure is ready)
-  const pageNum = parseInt(page, 10) || 1;
-  const limitNum = parseInt(limit, 10) || 1000;
-  const startIndex = (pageNum - 1) * limitNum;
-  const endIndex = startIndex + limitNum;
-  const paginatedRecords = allRecords.slice(startIndex, endIndex);
-  
+  // Return all records without pagination limit
   res.json({
-    records: paginatedRecords.map((row) => ({
+    records: allRecords.map((row) => ({
       ...row,
       remarksText: coerceRemarksText(row.remarks)
     })),
     pagination: {
       total: allRecords.length,
-      page: pageNum,
-      limit: limitNum,
-      totalPages: Math.ceil(allRecords.length / limitNum)
+      page: 1,
+      limit: allRecords.length,
+      totalPages: 1
     }
   });
 });
