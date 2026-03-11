@@ -815,13 +815,17 @@ textarea:focus {
   max-height: calc(100vh - 195px);
   min-height: 0;
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.04);
+
+  /* Column sizing is controlled by JS during drag via CSS variables to avoid re-render lag */
+  --table-cols: 140px 145px 80px 105px 200px 80px 105px 125px 110px 150px 130px 105px 100px;
+  --table-min-width: 1575px;
 }
 
 .table__row {
   display: grid;
   /* MC Ctrl | Sec Ctrl | Section | Date Rcvd | Subject | From | Target | Rcvd By | Action | Remarks | Units | Date Sent | Status */
-  grid-template-columns: 140px 145px 80px 105px 200px 80px 105px 125px 110px 150px 130px 105px 100px;
-  min-width: 1575px;
+  grid-template-columns: var(--table-cols);
+  min-width: var(--table-min-width);
   width: 100%;
   border-bottom: 1px solid #eef1f6;
 }
@@ -1992,6 +1996,35 @@ textarea:focus {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Column resize handle (Excel-like drag on header separators) */
+.table__col-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 5;
+  touch-action: none;
+}
+
+.table__col-resizer::before {
+  content: '';
+  position: absolute;
+  top: 15%;
+  bottom: 15%;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: rgba(59, 130, 246, 0.0);
+  border-radius: 2px;
+  transition: background 0.15s ease;
+}
+
+.table__cell--head:hover .table__col-resizer::before {
+  background: rgba(255, 255, 255, 0.55);
 }
 
 .table__cell--head:hover {
