@@ -377,11 +377,20 @@ function validateFieldLengths(payload) {
   return errors;
 }
 
-function formatCtrlNo(prefix, section, dateStr, seq) {
-  const date = dateStr.replace(/-/g, '').slice(2);
+// Section control number keeps the legacy date format: YYMMDD
+function formatSectionCtrlNo(prefix, section, dateStr, seq) {
+  const date = dateStr.replace(/-/g, '').slice(2); // YYMMDD
   const padded = String(seq).padStart(2, '0');
   const suffix = section ? `-${section}` : '-MC';
   return `${prefix}${suffix}-${date}-${padded}`;
+}
+
+// MC control number uses the requested format: RFU4A-MC-YYYY-MMDD-NN
+function formatMcCtrlNo(prefix, dateStr, seq) {
+  const [yyyy, mm, dd] = String(dateStr || '').split('-');
+  const date = yyyy && mm && dd ? `${yyyy}-${mm}${dd}` : String(dateStr || '');
+  const padded = String(seq).padStart(2, '0');
+  return `${prefix}-MC-${date}-${padded}`;
 }
 
 app.post('/auth/login', loginLimiter, validateInput({
@@ -433,8 +442,8 @@ async function getNextControlNumbers(section, dateReceived, preview = false) {
   const getCounter = preview ? db.getNextCounterPreview : db.getNextCounter;
   const mcSeq = await getCounter({ scope: 'MC', section: null, dateReceived });
   const sectionSeq = await getCounter({ scope: 'SECTION', section, dateReceived });
-  const mcCtrlNo = formatCtrlNo('RFU4A', null, dateReceived, mcSeq);
-  const sectionCtrlNo = formatCtrlNo('RFU4A', section, dateReceived, sectionSeq);
+  const mcCtrlNo = formatMcCtrlNo('RFU4A', dateReceived, mcSeq);
+  const sectionCtrlNo = formatSectionCtrlNo('RFU4A', section, dateReceived, sectionSeq);
   return { mcCtrlNo, sectionCtrlNo };
 }
 

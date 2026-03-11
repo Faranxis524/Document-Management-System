@@ -272,7 +272,60 @@ function peekNextCounter(existing, dateReceived) {
   return base + 1;
 }
 
+async function getHighestActualSequenceForCounter({ scope, section, dateReceived }) {
+  if (!dateReceived) return 0;
+
+  const extract = (ctrlNo) => {
+    if (!ctrlNo) return 0;
+    const m = String(ctrlNo).match(/-(\d+)$/);
+    return m ? parseInt(m[1], 10) : 0;
+  };
+
+  if (isSqlite) {
+    let rows;
+    if (scope === 'MC') {
+      rows = await allSqlite('SELECT mcCtrlNo AS ctrlNo FROM records WHERE dateReceived = ?;', [dateReceived]);
+    } else {
+      rows = await allSqlite('SELECT sectionCtrlNo AS ctrlNo FROM records WHERE section = ? AND dateReceived = ?;', [section, dateReceived]);
+    }
+    let highest = 0;
+    rows.forEach((r) => { highest = Math.max(highest, extract(r.ctrlNo)); });
+    return highest;
+  }
+
+  if (scope === 'MC') {
+    const result = await pgPool.query('SELECT "mcCtrlNo" AS "ctrlNo" FROM records WHERE "dateReceived" = $1;', [dateReceived]);
+    return result.rows.reduce((max, r) => Math.max(max, extract(r.ctrlNo)), 0);
+  }
+  const result = await pgPool.query(
+    'SELECT "sectionCtrlNo" AS "ctrlNo" FROM records WHERE section = $1 AND "dateReceived" = $2;',
+    [section, dateReceived]
+  );
+  return result.rows.reduce((max, r) => Math.max(max, extract(r.ctrlNo)), 0);
+}
+
 async function getNextCounterPreview({ scope, section, dateReceived }) {
+  // If there are already imported/created records for this date, the next counter
+  // should be based on the highest actual sequence in the records table.
+  if (dateReceived) {
+    const highestActual = await getHighestActualSequenceForCounter({ scope, section, dateReceived });
+
+    // Also consider the counters table (can be ahead of records during concurrent writes).
+    if (isSqlite) {
+      const existing = await getSqlite('SELECT * FROM counters WHERE scope = ? AND section IS ?;', [scope, section]);
+      const sameDate = existing && (existing.lastDateUsed === dateReceived);
+      const counterBase = sameDate ? (existing.currentNumber || 0) : 0;
+      return Math.max(counterBase, highestActual || 0) + 1;
+    }
+    const result = await pgPool.query('SELECT * FROM counters WHERE scope = $1 AND section IS NOT DISTINCT FROM $2 LIMIT 1;', [
+      scope,
+      section,
+    ]);
+    const existing = result.rows[0];
+    const sameDate = existing && (existing.lastdateused === dateReceived);
+    const counterBase = sameDate ? (existing.currentnumber || 0) : 0;
+    return Math.max(counterBase, highestActual || 0) + 1;
+  }
   if (isSqlite) {
     const existing = await getSqlite('SELECT * FROM counters WHERE scope = ? AND section IS ?;', [scope, section]);
     return peekNextCounter(existing, dateReceived);
@@ -285,6 +338,48 @@ async function getNextCounterPreview({ scope, section, dateReceived }) {
 }
 
 async function getNextCounter({ scope, section, dateReceived }) {
+  // Make numbering dynamic based on the records table so imported data is respected.
+  // Next number is always (highest existing sequence for that date) + 1.
+  if (dateReceived) {
+    if (isSqlite) {
+      const existing = await getSqlite('SELECT * FROM counters WHERE scope = ? AND section IS ?;', [scope, section]);
+      const highestActual = await getHighestActualSequenceForCounter({ scope, section, dateReceived });
+      const sameDate = existing && (existing.lastDateUsed === dateReceived);
+      const counterBase = sameDate ? (existing.currentNumber || 0) : 0;
+      const next = Math.max(counterBase, highestActual || 0) + 1;
+      if (!existing) {
+        await runSqlite('INSERT INTO counters (scope, section, currentNumber, lastDateUsed) VALUES (?, ?, ?, ?);', [
+          scope,
+          section,
+          next,
+          dateReceived,
+        ]);
+        return next;
+      }
+      await runSqlite('UPDATE counters SET currentNumber = ?, lastDateUsed = ? WHERE id = ?;', [next, dateReceived, existing.id]);
+      return next;
+    }
+
+    const result = await pgPool.query('SELECT * FROM counters WHERE scope = $1 AND section IS NOT DISTINCT FROM $2 LIMIT 1;', [
+      scope,
+      section,
+    ]);
+    const existing = result.rows[0];
+    const highestActual = await getHighestActualSequenceForCounter({ scope, section, dateReceived });
+    const sameDate = existing && (existing.lastdateused === dateReceived);
+    const counterBase = sameDate ? (existing.currentnumber || 0) : 0;
+    const next = Math.max(counterBase, highestActual || 0) + 1;
+    if (!existing) {
+      const insert = await pgPool.query(
+        'INSERT INTO counters (scope, section, currentNumber, lastDateUsed) VALUES ($1, $2, $3, $4) RETURNING currentNumber;',
+        [scope, section, next, dateReceived]
+      );
+      return insert.rows[0].currentnumber || next;
+    }
+    await pgPool.query('UPDATE counters SET currentNumber = $1, lastDateUsed = $2 WHERE id = $3;', [next, dateReceived, existing.id]);
+    return next;
+  }
+
   if (isSqlite) {
     const existing = await getSqlite('SELECT * FROM counters WHERE scope = ? AND section IS ?;', [scope, section]);
     const dateChanged = dateReceived && existing && existing.lastDateUsed !== dateReceived;
@@ -726,16 +821,26 @@ async function resetCountersForSection(section, dateReceived) {
   let highestMC = 0;
   let highestSection = 0;
 
+  const extractMcSeq = (cn) => {
+    if (!cn) return null;
+    // New format: RFU4A-MC-YYYY-MMDD-NN
+    let m = String(cn).match(/-MC-(\d{4})-(\d{4})-(\d{2})$/);
+    if (m) return parseInt(m[3], 10);
+    // Legacy format: RFU4A-MC-YYMMDD-NN
+    m = String(cn).match(/-MC-(\d{6})-(\d{2})$/);
+    if (m) return parseInt(m[2], 10);
+    // Fallback: last dash segment
+    m = String(cn).match(/-(\d+)$/);
+    return m ? parseInt(m[1], 10) : null;
+  };
+
   records.forEach(record => {
     const mcCtrlNo = isSqlite ? record.mcCtrlNo : record.mcCtrlNo;
     const sectionCtrlNo = isSqlite ? record.sectionCtrlNo : record.sectionCtrlNo;
 
     if (mcCtrlNo) {
-      const match = mcCtrlNo.match(/-MC-(\d+)-(\d+)$/);
-      if (match) {
-        const seq = parseInt(match[2], 10);
-        if (seq > highestMC) highestMC = seq;
-      }
+      const seq = extractMcSeq(mcCtrlNo);
+      if (seq !== null && seq > highestMC) highestMC = seq;
     }
 
     if (sectionCtrlNo) {
@@ -812,18 +917,32 @@ async function validateControlNumbers(section, dateReceived) {
   });
 
   // Check for missing numbers (gaps in sequence)
-  const extractSequence = (controlNumber, pattern) => {
-    const match = controlNumber.match(pattern);
+  const extractMcSequence = (cn) => {
+    if (!cn) return null;
+    // New format: RFU4A-MC-YYYY-MMDD-NN
+    let m = String(cn).match(/-MC-(\d{4})-(\d{4})-(\d{2})$/);
+    if (m) return parseInt(m[3], 10);
+    // Legacy format: RFU4A-MC-YYMMDD-NN
+    m = String(cn).match(/-MC-(\d{6})-(\d{2})$/);
+    if (m) return parseInt(m[2], 10);
+    // Fallback: last dash segment
+    m = String(cn).match(/-(\d+)$/);
+    return m ? parseInt(m[1], 10) : null;
+  };
+
+  const extractSectionSequence = (cn) => {
+    if (!cn) return null;
+    const match = String(cn).match(/-(\d+)-(\d+)$/);
     return match ? parseInt(match[2], 10) : null;
   };
 
   const mcSequences = Array.from(mcNumbers)
-    .map(cn => extractSequence(cn, /-MC-(\d+)-(\d+)$/))
+    .map(extractMcSequence)
     .filter(n => n !== null)
     .sort((a, b) => a - b);
 
   const sectionSequences = Array.from(sectionNumbers)
-    .map(cn => extractSequence(cn, /-(\d+)-(\d+)$/))
+    .map(extractSectionSequence)
     .filter(n => n !== null)
     .sort((a, b) => a - b);
 

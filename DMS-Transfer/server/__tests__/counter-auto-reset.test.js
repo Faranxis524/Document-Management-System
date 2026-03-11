@@ -105,7 +105,7 @@ describe('Counter Auto-Reset on Empty Database', () => {
 
     expect(newRecord.status).toBe(200);
     expect(newRecord.body.sectionCtrlNo).toBe('RFU4A-INVES-260218-01');
-    expect(newRecord.body.mcCtrlNo).toBe('RFU4A-MC-260218-01');
+    expect(newRecord.body.mcCtrlNo).toBe('RFU4A-MC-2026-0218-01');
     
     console.log('Counter successfully reset to 01 after deleting all records');
   });
