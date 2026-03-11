@@ -392,7 +392,7 @@ app.post('/records', authMiddleware, async (req, res) => {
 });
 
 app.get('/records', authMiddleware, async (req, res) => {
-  const { section, page = '1', limit = '1000' } = req.query;
+  const { section } = req.query;
   const filters = {};
   if (req.user.role === 'SECTION') {
     filters.section = req.user.section;
@@ -400,26 +400,21 @@ app.get('/records', authMiddleware, async (req, res) => {
     filters.section = section;
   }
   const allRecords = await db.listRecords(filters);
-  
-  // Pagination support (currently returns all, but infrastructure is ready)
-  const pageNum = parseInt(page, 10) || 1;
-  const limitNum = parseInt(limit, 10) || 1000;
-  const startIndex = (pageNum - 1) * limitNum;
-  const endIndex = startIndex + limitNum;
-  const paginatedRecords = allRecords.slice(startIndex, endIndex);
-  
+
+  // NOTE: Return ALL records (no default 1000-row cap).
+  // This avoids hiding later months (e.g., Jan/Feb) when the dataset grows.
   res.json({
-    records: paginatedRecords.map((row) => ({
+    records: allRecords.map((row) => ({
       ...row,
       remarksText: coerceRemarksText(row.remarks),
-      status: row.status || db.calculateStatus(row) // Auto-calculate status if not set
+      status: row.status || db.calculateStatus(row), // Auto-calculate status if not set
     })),
     pagination: {
       total: allRecords.length,
-      page: pageNum,
-      limit: limitNum,
-      totalPages: Math.ceil(allRecords.length / limitNum)
-    }
+      page: 1,
+      limit: allRecords.length,
+      totalPages: 1,
+    },
   });
 });
 

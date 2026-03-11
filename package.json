@@ -8,12 +8,14 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^13.5.0",
+    "csv-parse": "^6.1.0",
     "jspdf": "^4.1.0",
     "jspdf-autotable": "^5.0.7",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-scripts": "5.0.1",
     "socket.io-client": "^4.8.3",
+    "sqlite3": "^5.1.7",
     "web-vitals": "^2.1.4"
   },
   "main": "electron.js",
@@ -56,10 +58,14 @@
       "buildResources": "public"
     },
     "win": {
-      "target": ["dir"],
+      "target": [
+        "dir"
+      ],
       "requestedExecutionLevel": "asInvoker",
       "signAndEditExecutable": false,
-      "signExts": [".never-sign"]
+      "signExts": [
+        ".never-sign"
+      ]
     },
     "nsis": {
       "oneClick": false,
