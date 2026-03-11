@@ -14,12 +14,13 @@ function StatusBadge({ status }) {
 
 function ActionBadge({ action }) {
   const map = {
-    DRAFTED:      { cls: 'action-badge--drafted',      label: 'Drafted' },
-    DISSEMINATED: { cls: 'action-badge--disseminated', label: 'Disseminated' },
-    FILED:        { cls: 'action-badge--filed',        label: 'Filed' },
+    DRAFTED: 'Drafted',
+    DISSEMINATED: 'Disseminated',
+    FILED: 'Filed',
   };
-  const { cls = '', label = action } = map[action] || {};
-  return <span className={`action-badge ${cls}`}>{label}</span>;
+  const label = map[action] || action || '';
+  // Plain text (no badge styling)
+  return <span>{label}</span>;
 }
 
 function SkeletonRow() {
