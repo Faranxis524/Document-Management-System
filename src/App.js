@@ -19,6 +19,7 @@ import ActivityLog from './components/ActivityLog';
 import ExpandedTableModal from './components/ExpandedTableModal';
 import ToastContainer from './components/ToastContainer';
 import UserManagement from './components/UserManagement';
+import ExportSignatoriesModal from './components/ExportSignatoriesModal';
 
 function App() {
   const [view, setView] = useState(() => {
@@ -48,6 +49,7 @@ function App() {
     }
   });
   const [isTableExpanded, setIsTableExpanded] = useState(false);
+  const [isSignatoriesModalOpen, setIsSignatoriesModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const sessionRestoredRef = useRef(false);
 
@@ -211,9 +213,7 @@ function App() {
               setSortOrder={setSortOrder}
               records={records}
               displayRecords={displayRecords}
-              filterMonthForPdf={filterMonth}
-              filterYearForPdf={filterYear}
-              handleExportPdf={handleExportPdf}
+              onOpenSignatoriesModal={() => setIsSignatoriesModalOpen(true)}
               handleExportCsv={handleExportCsv}
               handleExportExcel={handleExportExcel}
               refreshRecords={refreshRecords}
@@ -288,6 +288,15 @@ function App() {
           authToken={authToken}
         />
       )}
+
+      <ExportSignatoriesModal
+        isOpen={isSignatoriesModalOpen}
+        onClose={() => setIsSignatoriesModalOpen(false)}
+        onSubmit={(signatories) => {
+          setIsSignatoriesModalOpen(false);
+          handleExportPdf(displayRecords, activeSection, filterMonth, filterYear, signatories);
+        }}
+      />
 
       <EditModal
         isMc={isMc}

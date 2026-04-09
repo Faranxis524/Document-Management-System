@@ -1457,6 +1457,55 @@ textarea:focus {
   border-color: var(--danger);
 }
 
+.export-signatories-modal {
+  backdrop-filter: blur(8px);
+}
+
+.export-signatories-modal__card {
+  width: min(920px, 94vw);
+}
+
+.export-signatories-modal__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.export-signatories-modal__grid label {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-light);
+}
+
+.export-signatories-modal__grid input {
+  height: 40px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  padding: 0 12px;
+  background: var(--white);
+  font-size: 13px;
+}
+
+.export-signatories-modal__grid input:hover {
+  border-color: var(--blue-400);
+}
+
+.export-signatories-modal__actions {
+  margin-top: 16px;
+}
+
+@media (max-width: 920px) {
+  .export-signatories-modal__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .export-signatories-modal__card {
+    width: min(540px, 94vw);
+  }
+}
+
 /* Toast Notifications */
 .toast-container {
   position: fixed;

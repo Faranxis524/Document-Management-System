@@ -10,7 +10,6 @@ import {
   DEFAULT_FROM,
   RECEIVED_BY,
   TABLE_COLUMNS,
-  REPORT_SIGNATORIES,
   getFromOptions,
   parseSections,
 } from '../constants';

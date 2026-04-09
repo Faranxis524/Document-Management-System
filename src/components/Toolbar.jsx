@@ -28,9 +28,7 @@ export default function Toolbar({
   // export handlers (receive displayRecords for PDF)
   displayRecords,
   totalRecords,
-  filterMonthForPdf,
-  filterYearForPdf,
-  handleExportPdf,
+  onOpenSignatoriesModal,
   handleExportCsv,
   handleExportExcel,
   refreshRecords,
@@ -44,12 +42,6 @@ export default function Toolbar({
   // All hooks must be at the top level
   const [searchLocal, setSearchLocal] = useState(search);
   const debounceTimer = useRef(null);
-  const [showPdfModal, setShowPdfModal] = useState(false);
-  const [pdfForm, setPdfForm] = useState({
-    adminPnco: '',
-    chiefAdmin: '',
-    regionalChief: '',
-  });
   const currentYear = new Date().getFullYear();
   const availableYears = useMemo(() => {
     const yearSet = new Set([String(currentYear)]);
@@ -66,16 +58,6 @@ export default function Toolbar({
     setSearchLocal(val);
     clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => setSearch(val), 250);
-  };
-  const openPdfModal = () => setShowPdfModal(true);
-  const closePdfModal = () => setShowPdfModal(false);
-  const handlePdfFormChange = (e) => {
-    setPdfForm({ ...pdfForm, [e.target.name]: e.target.value });
-  };
-  const handlePdfFormSubmit = (e) => {
-    e.preventDefault();
-    setShowPdfModal(false);
-    handleExportPdf(displayRecords, activeSection, filterMonthForPdf, filterYearForPdf, pdfForm);
   };
 
   if (activeSection === 'Activity Log') {
@@ -228,7 +210,7 @@ export default function Toolbar({
           {isLoadingRecords ? 'Refreshing…' : 'Refresh'}
         </button>
         <div className="toolbar__exports">
-          <button type="button" onClick={openPdfModal}>
+          <button type="button" onClick={onOpenSignatoriesModal}>
             Export PDF
           </button>
           <button type="button" onClick={handleExportCsv}>
@@ -238,76 +220,6 @@ export default function Toolbar({
             Export Excel
           </button>
         </div>
-
-        {/* PDF Export Modal */}
-        {showPdfModal && (
-          <div className="modal" onClick={closePdfModal}>
-            <div
-              className="modal__card"
-              onClick={e => e.stopPropagation()}
-              role="dialog"
-              aria-modal="true"
-              style={{
-                minWidth: 440,
-                maxWidth: 520,
-                padding: '2.5rem 2.5rem 2rem 2.5rem',
-                borderRadius: 18,
-                boxShadow: '0 8px 32px 0 rgba(60,60,90,0.18)',
-                background: '#fff',
-                margin: '0 auto',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-              }}
-            >
-              <h3 style={{ marginBottom: 24, textAlign: 'center', fontSize: 24, fontWeight: 700, letterSpacing: 0.2 }}>Export PDF — Signatories</h3>
-              <form onSubmit={handlePdfFormSubmit} style={{ width: '100%' }}>
-                <div style={{ display: 'flex', gap: 24, justifyContent: 'space-between', marginBottom: 28 }}>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <label htmlFor="adminPnco" style={{ fontWeight: 600, marginBottom: 8, fontSize: 15 }}>Admin PNCO</label>
-                    <input
-                      id="adminPnco"
-                      type="text"
-                      name="adminPnco"
-                      value={pdfForm.adminPnco}
-                      onChange={handlePdfFormChange}
-                      required
-                      style={{ width: '100%', padding: '10px 8px', borderRadius: 7, border: '1.5px solid #bfc6d1', textAlign: 'center', fontSize: 15, background: '#f8fafc' }}
-                    />
-                  </div>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <label htmlFor="chiefAdmin" style={{ fontWeight: 600, marginBottom: 8, fontSize: 15 }}>Chief, Admin Section</label>
-                    <input
-                      id="chiefAdmin"
-                      type="text"
-                      name="chiefAdmin"
-                      value={pdfForm.chiefAdmin}
-                      onChange={handlePdfFormChange}
-                      required
-                      style={{ width: '100%', padding: '10px 8px', borderRadius: 7, border: '1.5px solid #bfc6d1', textAlign: 'center', fontSize: 15, background: '#f8fafc' }}
-                    />
-                  </div>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <label htmlFor="regionalChief" style={{ fontWeight: 600, marginBottom: 8, fontSize: 15 }}>Regional Chief</label>
-                    <input
-                      id="regionalChief"
-                      type="text"
-                      name="regionalChief"
-                      value={pdfForm.regionalChief}
-                      onChange={handlePdfFormChange}
-                      required
-                      style={{ width: '100%', padding: '10px 8px', borderRadius: 7, border: '1.5px solid #bfc6d1', textAlign: 'center', fontSize: 15, background: '#f8fafc' }}
-                    />
-                  </div>
-                </div>
-                <div className="modal__actions modal__actions--spread" style={{ marginTop: 8 }}>
-                  <button type="button" className="secondary" onClick={closePdfModal} style={{ padding: '10px 22px', borderRadius: 7, fontSize: 15 }}>Cancel</button>
-                  <button type="submit" className="primary" style={{ padding: '10px 22px', borderRadius: 7, fontSize: 15 }}>Export PDF</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
       </div>
 
     </div>
