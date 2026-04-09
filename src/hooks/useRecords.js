@@ -440,7 +440,7 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
       .replace(/[^\u0000-\u00FF]/g, '?');          // replace remaining non-latin1 with ?
   };
 
-  const handleExportPdf = async (displayRecords, activeSection, filterMonth, filterYear) => {
+  const handleExportPdf = async (displayRecords, activeSection, filterMonth, filterYear, signatories) => {
     // Convert CIDG SVG → PNG data URL via canvas (jsPDF only supports raster images)
     const svgToPng = (svgUrl) => new Promise((resolve) => {
       const img = new Image();
@@ -631,7 +631,8 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
       },
     });
 
-    // ── Signatory block ───────────────────────────────────────────────────────
+
+    // ── Signatory block (signature lines only) ───────────────────────────────
     const blockW  = contentW / 3;
     let   signY   = (doc.lastAutoTable?.finalY || TABLE_START) + 10;
     if (signY > FOOTER_Y - 38) {
@@ -641,8 +642,19 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
       signY = TABLE_START;
     }
 
+    // Use provided signatory names for signature lines, render names above the line
     const SIGN_LABELS = ['Prepared by:', 'Noted by:', 'Approved by:'];
-    REPORT_SIGNATORIES.forEach((person, i) => {
+    const positions = [
+      'Admin PNCO',
+      'Chief, Admin Section',
+      'Regional Chief',
+    ];
+    const names = [
+      signatories?.adminPnco || '',
+      signatories?.chiefAdmin || '',
+      signatories?.regionalChief || '',
+    ];
+    for (let i = 0; i < 3; i++) {
       const bx  = margin + blockW * i;
       const bcx = bx + blockW / 2;
 
@@ -656,16 +668,19 @@ export function useRecords({ authToken, currentUser, isMc, showToast }) {
       doc.setLineWidth(0.35);
       doc.line(bx + 6, lineY, bx + blockW - 6, lineY);
 
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.setTextColor(...GRAY_DARK);
-      doc.text(pdfSafe(person.name) || '________________________________', bcx, lineY + 5, { align: 'center' });
+      // Name below the line (if provided)
+      if (names[i]) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(...GRAY_DARK);
+        doc.text(names[i], bcx, lineY + 5, { align: 'center' });
+      }
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6.8);
       doc.setTextColor(...GRAY_MID);
-      doc.text(pdfSafe(person.position), bcx, lineY + 10, { align: 'center' });
-    });
+      doc.text(positions[i], bcx, lineY + 10, { align: 'center' });
+    }
 
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(6.5);
