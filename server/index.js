@@ -165,7 +165,7 @@ const DEFAULT_RECEIVED_BY = {
   INTEL: ['NUP Joyce', 'PCPL Jose'],
   ADM: ['NUP San Pedro', 'PMSG Foncardas'],
   PCR: [],
-  ISO: [],
+  ISO: ['NUP Tala'],
 };
 
 function signToken(user) {

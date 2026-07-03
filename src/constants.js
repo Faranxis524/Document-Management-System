@@ -42,7 +42,7 @@ export const RECEIVED_BY = {
   INTEL: ['NUP Joyce', 'PCPL Jose'],
   ADM: ['NUP San Pedro', 'PMSG Foncardas'],
   PCR: [],
-  ISO: [],
+  ISO: ['NUP Tala'],
 };
 
 export const TABLE_COLUMNS = [
