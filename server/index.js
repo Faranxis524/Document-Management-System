@@ -155,7 +155,8 @@ const DEFAULT_FROM = {
   OPN: 'OMD',
   INTEL: 'ID',
   ADM: 'ARMD',
-  'OPN/PCR': 'PCRS',
+  PCR: 'PCRS',
+  ISO: 'ISO',
 };
 
 const DEFAULT_RECEIVED_BY = {
@@ -163,7 +164,8 @@ const DEFAULT_RECEIVED_BY = {
   OPN: ['NUP Aldrin', 'PCPL Bueno', 'PAT Duyag'],
   INTEL: ['NUP Joyce', 'PCPL Jose'],
   ADM: ['NUP San Pedro', 'PMSG Foncardas'],
-  'OPN/PCR': [],
+  PCR: [],
+  ISO: [],
 };
 
 function signToken(user) {
@@ -435,7 +437,7 @@ app.get('/users/me', authMiddleware, (req, res) => {
 });
 
 app.get('/sections', (_req, res) => {
-  res.json({ sections: ['INVES', 'INTEL', 'ADM', 'OPN', 'OPN/PCR'] });
+  res.json({ sections: ['INVES', 'INTEL', 'ADM', 'OPN', 'PCR', 'ISO'] });
 });
 
 async function getNextControlNumbers(section, dateReceived, preview = false) {

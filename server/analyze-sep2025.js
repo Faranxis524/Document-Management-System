@@ -118,6 +118,6 @@ console.log('  "OPNS"  → "OPN"');
 console.log('  "Intel" → "INTEL"');
 console.log('  "Inves" / "INVES" → "INVES"');
 console.log('  "Admin" → "ADM"');
-console.log('  "PCRS"  → "OPN/PCR"  (assumed — please confirm)');
+console.log('  "PCRS"  → "PCR"  (assumed — please confirm)');
 console.log('\nSystem knownActions: ["DRAFTED", "DISSEMINATED", "FILED"]');
 console.log('Status: computed (Pending/Completed/Overdue) — NOT stored from CSV');

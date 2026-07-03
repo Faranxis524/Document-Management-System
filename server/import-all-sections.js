@@ -17,7 +17,7 @@ const SECTION_MAP = {
   'INTEL': 'INTEL',
   'INVES': 'INVES',
   'ADMIN': 'ADM',
-  'PCRS' : 'OPN/PCR',
+  'PCRS' : 'PCR',
 };
 
 function mapSection(raw) {
